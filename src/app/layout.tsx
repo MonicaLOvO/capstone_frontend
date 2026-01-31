@@ -1,10 +1,12 @@
-import './globals.css';
-import { ReactNode } from 'react';
-import ThemeRegistry from '@/components/ThemeRegistry';
+import "./globals.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import { ReactNode } from "react";
+import ThemeRegistry from "@/components/ThemeRegistry";
 
 export const metadata = {
-  title: 'Capstone WMS',
-  description: 'Warehouse Management System',
+  title: "Capstone WMS",
+  description: "Warehouse Management System",
 };
 
 export default function RootLayout({
@@ -15,9 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ThemeRegistry>
-          {children}
-        </ThemeRegistry>
+        <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>
   );

@@ -17,7 +17,7 @@ export default function DashboardLayout({
   const userRole: UserRole = "staff"; // later from auth
 
   return (
-    <Box sx={{ display: "flex", height: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       {/* Desktop Sidebar */}
       <Box
         sx={{

@@ -1,12 +1,34 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import {Box,Button,Chip,Input,Option,Select,Sheet,Table,Typography,} from "@mui/joy";
+import {
+  Box,
+  Button,
+  Chip,
+  Input,
+  Option,
+  Select,
+  Sheet,
+  Table,
+  Typography,
+  Modal,
+  ModalDialog,
+  DialogTitle,
+  DialogContent,
+  Stack,
+} from "@mui/joy";
 
 import { inventoryApi } from "@/app/api/inventory/inventory.api";
-import {InventoryItemStatusEnum,type InventoryListQuery,} from "@/app/api/inventory/inventory.types";
+import {
+  InventoryItemStatusEnum,
+  type InventoryListQuery,
+  type InventoryItemDTO,
+} from "@/app/api/inventory/inventory.types";
 import { type InventoryItem } from "@/app/api/inventory/inventory.mapper";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+
+import { InventoryRowMenu } from "@/components/inventory/InventoryRowMenu";
+import { InventoryItemDialog } from "@/components/inventory/InventoryItemDialog";
 
 function statusChip(status: string) {
   switch (status) {
@@ -29,8 +51,8 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
 
-  const [category, setCategory] = useState<string>(""); // "" => all
-  const [status, setStatus] = useState<string>(""); // "" => all
+  const [category, setCategory] = useState<string>("");
+  const [status, setStatus] = useState<string>("");
 
   // Paging
   const [page, setPage] = useState(1);
@@ -43,6 +65,21 @@ export default function InventoryPage() {
   // UI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // dialogs
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [selected, setSelected] = useState<InventoryItem | null>(null);
+
+  // delete confirm
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // QR lookup modal (simple: type/paste QR value)
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrValue, setQrValue] = useState("");
 
   const categoryOptions = useMemo(
     () => ["", "Electronics", "Furniture", "Safety", "Supplies", "Tools"],
@@ -59,6 +96,40 @@ export default function InventoryPage() {
     []
   );
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  async function refresh() {
+    const term = debouncedSearch.trim();
+
+    const baseQuery: InventoryListQuery = {
+      Page: page,
+      PageSize: pageSize,
+      Category: category || undefined,
+      Status: status ? Number(status) : undefined,
+      OrderColumn: "ProductName",
+      OrderDirection: "asc",
+    };
+
+    // backend filters are exact: search both fields and merge
+    if (!term) {
+      const res = await inventoryApi.list(baseQuery);
+      setItems(res.items);
+      setTotal(res.total);
+      return;
+    }
+
+    const [byName, bySku] = await Promise.all([
+      inventoryApi.list({ ...baseQuery, ProductName: term }),
+      inventoryApi.list({ ...baseQuery, Sku: term }),
+    ]);
+
+    const map = new Map<string, InventoryItem>();
+    [...byName.items, ...bySku.items].forEach((x) => map.set(x.id, x));
+
+    setItems(Array.from(map.values()));
+    setTotal(Math.max(byName.total, bySku.total));
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -66,37 +137,7 @@ export default function InventoryPage() {
       try {
         setLoading(true);
         setError(null);
-
-        const term = debouncedSearch.trim();
-
-        const baseQuery: InventoryListQuery = {
-          Page: page,
-          PageSize: pageSize,
-          Category: category || undefined,
-          Status: status ? Number(status) : undefined,
-          OrderColumn: "ProductName",
-          OrderDirection: "asc",
-        };
-
-        if (!term) {
-          const res = await inventoryApi.list(baseQuery);
-          if (cancelled) return;
-          setItems(res.items);
-          setTotal(res.total);
-          return;
-        }
-
-        const [byName, bySku] = await Promise.all([
-          inventoryApi.list({ ...baseQuery, ProductName: term }),
-          inventoryApi.list({ ...baseQuery, Sku: term }),
-        ]);
-
-        if (cancelled) return;
-
-        const map = new Map<string, InventoryItem>();
-        [...byName.items, ...bySku.items].forEach((x) => map.set(x.id, x));
-        setItems(Array.from(map.values()));
-        setTotal(Math.max(byName.total, bySku.total));
+        await refresh();
       } catch (err: unknown) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -109,13 +150,84 @@ export default function InventoryPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, category, status, page]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  async function handleCreate(payload: Omit<InventoryItemDTO, "Id">) {
+    setSubmitting(true);
+    try {
+      await inventoryApi.create(payload);
+      // reload first page so new item is visible
+      setPage(1);
+      await refresh();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleEdit(payload: Omit<InventoryItemDTO, "Id">) {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      // backend expects Id in payload in your sample PUT body,
+      // so we include it for safety:
+      await inventoryApi.update(selected.id, {
+        Id: selected.id,
+        ...payload,
+      });
+      await refresh();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteConfirmed() {
+    if (!selected) return;
+    setDeleteSubmitting(true);
+    try {
+      await inventoryApi.remove(selected.id);
+      setDeleteOpen(false);
+      await refresh();
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  }
+
+  async function handleQrLookup() {
+    const q = qrValue.trim();
+    if (!q) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      // simplest lookup: filter list by QrCodeValue if your backend supports it.
+      // If backend DOES NOT support QrCodeValue filter, we will do client-side filter after list().
+      const res = await inventoryApi.list({
+        Page: 1,
+        PageSize: 50,
+        OrderColumn: "ProductName",
+        OrderDirection: "asc",
+      });
+
+      const found = res.items.find((x) => x.qrCodeValue === q);
+      if (!found) {
+        setError("No item found for that QR code value.");
+      } else {
+        setSelected(found);
+        setEditOpen(true); // open details/edit
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "QR lookup failed");
+    } finally {
+      setLoading(false);
+      setQrOpen(false);
+      setQrValue("");
+    }
+  }
 
   return (
     <Box sx={{ width: "100%" }}>
-      {/* Header row (like Orders) */}
+      {/* Header */}
       <Box
         sx={{
           display: "flex",
@@ -135,16 +247,17 @@ export default function InventoryPage() {
           </Typography>
         </Box>
 
-        <Button
-          color="primary"
-          onClick={() => alert("Open Add Product modal")}
-          sx={{ borderRadius: "lg" }}
-        >
-          + Add Product
-        </Button>
+        <Stack direction="row" spacing={1.5}>
+          <Button variant="outlined" color="neutral" onClick={() => setQrOpen(true)}>
+            QR Lookup
+          </Button>
+          <Button color="primary" onClick={() => setCreateOpen(true)}>
+            + Add Product
+          </Button>
+        </Stack>
       </Box>
 
-      {/* Filters row */}
+      {/* Filters */}
       <Box
         sx={{
           display: "grid",
@@ -173,8 +286,6 @@ export default function InventoryPage() {
           <Typography level="body-sm" sx={{ mb: 1 }}>
             Status
           </Typography>
-
-          {/* Accessible name */}
           <Select
             value={status}
             onChange={(_, v) => {
@@ -196,8 +307,6 @@ export default function InventoryPage() {
           <Typography level="body-sm" sx={{ mb: 1 }}>
             Category
           </Typography>
-
-          {/* Accessible name */}
           <Select
             value={category}
             onChange={(_, v) => {
@@ -216,16 +325,8 @@ export default function InventoryPage() {
         </Box>
       </Box>
 
-      {/* Table Card */}
-      <Sheet
-        variant="outlined"
-        sx={{
-          borderRadius: "lg",
-          overflow: "hidden",
-          width: "100%",
-        }}
-      >
-        {/* Top bar */}
+      {/* Table */}
+      <Sheet variant="outlined" sx={{ borderRadius: "lg", overflow: "hidden", width: "100%" }}>
         <Box
           sx={{
             px: 2,
@@ -254,7 +355,7 @@ export default function InventoryPage() {
             stickyHeader
             hoverRow
             sx={{
-              minWidth: 900,
+              minWidth: 980,
               "& thead th": { fontWeight: 700 },
               "& tbody td": { verticalAlign: "middle" },
             }}
@@ -268,7 +369,7 @@ export default function InventoryPage() {
                 <th style={{ width: 240 }}>Location</th>
                 <th style={{ width: 120 }}>Price</th>
                 <th style={{ width: 140 }}>Status</th>
-                <th style={{ width: 90, textAlign: "right" }}>Action</th>
+                <th style={{ width: 70, textAlign: "right" }} />
               </tr>
             </thead>
 
@@ -304,14 +405,21 @@ export default function InventoryPage() {
                         </Chip>
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        <Button
-                          size="sm"
-                          variant="soft"
-                          onClick={() => alert(`Edit ${it.id}`)}
-                          aria-label={`Edit ${it.productName || "item"}`}
-                        >
-                          ✎
-                        </Button>
+                        <InventoryRowMenu
+                          onEdit={() => {
+                            setSelected(it);
+                            setEditOpen(true);
+                          }}
+                          onQr={() => {
+                            // show QR data (or you can open edit and highlight)
+                            setQrValue(it.qrCodeValue || "");
+                            setQrOpen(true);
+                          }}
+                          onDelete={() => {
+                            setSelected(it);
+                            setDeleteOpen(true);
+                          }}
+                        />
                       </td>
                     </tr>
                   );
@@ -356,6 +464,93 @@ export default function InventoryPage() {
           </Button>
         </Box>
       </Sheet>
+
+      {/* Create Dialog */}
+      <InventoryItemDialog
+        open={createOpen}
+        mode="create"
+        onClose={() => setCreateOpen(false)}
+        onSubmit={handleCreate}
+        submitting={submitting}
+      />
+
+      {/* Edit Dialog */}
+      <InventoryItemDialog
+        open={editOpen}
+        mode="edit"
+        initial={
+          selected
+            ? ({
+                Id: selected.id,
+                ProductName: selected.productName,
+                Sku: selected.sku,
+                Category: selected.category,
+                Quantity: selected.quantity,
+                UnitPrice: selected.unitPrice,
+                Location: selected.location,
+                QrCodeValue: selected.qrCodeValue,
+                Description: selected.description,
+                ImageUrl: selected.imageUrl,
+                Status: selected.status,
+              } satisfies Partial<InventoryItemDTO>)
+            : null
+        }
+        onClose={() => setEditOpen(false)}
+        onSubmit={handleEdit}
+        submitting={submitting}
+      />
+
+      {/* Delete confirm */}
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)}>
+        <ModalDialog variant="outlined" role="alertdialog" sx={{ borderRadius: "lg", width: 420 }}>
+          <DialogTitle>Delete item?</DialogTitle>
+          <DialogContent>
+            <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
+              This action cannot be undone. The item will be removed from inventory.
+            </Typography>
+
+            <Typography sx={{ mt: 1 }} fontWeight={600}>
+              {selected?.productName || "Item"}
+            </Typography>
+
+            <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ mt: 2 }}>
+              <Button variant="outlined" color="neutral" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button color="danger" loading={deleteSubmitting} onClick={handleDeleteConfirmed}>
+                Delete
+              </Button>
+            </Stack>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
+
+      {/* QR Lookup modal (paste QR value for now) */}
+      <Modal open={qrOpen} onClose={() => setQrOpen(false)}>
+        <ModalDialog variant="outlined" sx={{ borderRadius: "lg", width: 520 }}>
+          <DialogTitle>QR Code Lookup</DialogTitle>
+          <DialogContent>
+            <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
+              Paste or scan a QR code value to find an item quickly.
+            </Typography>
+
+            <Input
+              sx={{ mt: 2 }}
+              value={qrValue}
+              onChange={(e) => setQrValue(e.target.value)}
+              placeholder="QR-INV-001-..."
+              autoFocus
+            />
+
+            <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ mt: 2 }}>
+              <Button variant="outlined" color="neutral" onClick={() => setQrOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleQrLookup}>Find Item</Button>
+            </Stack>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

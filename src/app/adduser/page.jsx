@@ -9,7 +9,7 @@ export default function AddUser() {
   const [theme, setTheme] = useState("dark"); // dark/light mode
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState(""); // replaced username with email
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("Employee");
   const [loading, setLoading] = useState(false);
@@ -46,7 +46,7 @@ export default function AddUser() {
     setError("");
     setSuccess("");
 
-    if (!firstName || !lastName || !username || !password || !role) {
+    if (!firstName || !lastName || !email || !password || !role) {
       setError("Please fill in all fields");
       return;
     }
@@ -69,10 +69,10 @@ export default function AddUser() {
       // Replace this with your API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      setSuccess(`User "${username}" (${role}) created successfully!`);
+      setSuccess(`User "${email}" (${role}) created successfully!`);
       setFirstName("");
       setLastName("");
-      setUsername("");
+      setEmail(""); // reset email
       setPassword("");
       setRole("Employee"); // reset to default
     } catch (err) {
@@ -170,10 +170,10 @@ export default function AddUser() {
           />
 
           <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             style={{
               padding: "12px",
               borderRadius: "8px",

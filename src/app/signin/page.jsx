@@ -11,7 +11,7 @@ export default function Login() {
   const router = useRouter();
   const { signIn, isAuthenticated } = useAuth(); 
 
-  const [theme, setTheme] = useState("dark"); // "light" | "dark"
+  const [theme, setTheme] = useState("light"); // "light" | "dark"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);

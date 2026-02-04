@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth/authContext";
 export default function AddUser() {
   const { isAuthenticated } = useAuth(); // optional: check auth
 
-  const [theme, setTheme] = useState("dark"); // dark/light mode
+  const [theme, setTheme] = useState("light"); // dark/light mode
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState(""); // replaced username with email

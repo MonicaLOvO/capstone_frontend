@@ -30,8 +30,6 @@ import { useState } from 'react';
 
 
 function RowMenu() {
-
-    const [orderList, setOrderList] = useState<Order[]>([]);
     
   return (
     <Dropdown>
@@ -53,6 +51,8 @@ function RowMenu() {
 }
 
 export default function OrderList() {
+  const [orderList, setOrderList] = useState<Order[]>([]);
+  
   return (
     <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
       {orderList.map((order) => (

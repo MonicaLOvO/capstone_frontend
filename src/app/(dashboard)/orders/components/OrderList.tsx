@@ -27,7 +27,16 @@ import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 
 import { useState } from 'react';
 
-
+interface Order {
+  id: string;
+  customer: {
+    name: string;
+    email: string;
+    initial: string;
+  };
+  date: string;
+  status: 'Paid' | 'Refunded' | 'Cancelled';
+}
 
 function RowMenu() {
     
@@ -52,7 +61,7 @@ function RowMenu() {
 
 export default function OrderList() {
   const [orderList, setOrderList] = useState<Order[]>([]);
-  
+
   return (
     <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
       {orderList.map((order) => (

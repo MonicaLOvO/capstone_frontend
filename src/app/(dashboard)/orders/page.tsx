@@ -1,11 +1,32 @@
-import { Box, Typography, Button, Sheet, FormControl, Input, FormLabel, Select, Option } from '@mui/joy';
+'use client';
+
+import { Box, Typography, Button, Sheet, FormControl, Input, FormLabel, Select, Option, IconButton, iconButtonClasses } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import React from 'react';
+import React, { useState } from 'react';
 import OrderTable from './components/OrderTable';
 import OrderList from './components/OrderList';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 
 export default function OrdersPage() {
   
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  const [total, setTotal] = useState(0);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // const { isAuthenticated } = useAuth();
+
+  // Check if user is logged in
+    // useEffect(() => {
+    //     if (isAuthenticated) {
+    //         router.replace('/(tabs)/home');
+    //     }
+    // }, [isAuthenticated, router]);
+
+    
+
   const renderFilters = () => (
     <React.Fragment>
       <FormControl size="sm">
@@ -45,51 +66,87 @@ export default function OrdersPage() {
   );
   
   return (
-    <Box>
-      {/* Page Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mb: 3,
-        }}
-      >
-        <Typography level="h2">Orders</Typography>
+    <React.Fragment>
+      <Box>
+        {/* Page Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 3,
+          }}
+        >
+          <Typography level="h2">Orders</Typography>
 
-        <Button variant="solid" color="primary">
-          Download PDF
-        </Button>
-      </Box>
-      
-
-      {/* Table Filters */}
-
-      <Box
-        className="SearchAndFilters-tabletUp"
-        sx={{
-          borderRadius: 'sm',
-          py: 2,
-          display: { xs: 'none', sm: 'flex' },
-          flexWrap: 'wrap',
-          gap: 1.5,
-          '& > *': {
-            minWidth: { xs: '120px', md: '160px' },
-          },
-        }}
-      >
+          <Button variant="solid" color="primary">
+            Download PDF
+          </Button>
+        </Box>
         
-        <FormControl sx={{ flex: 1 }} size="sm">
-          <FormLabel>Search for order</FormLabel>
-          <Input size="sm" placeholder="Search" startDecorator={<SearchIcon />} />
-        </FormControl>
 
-        {renderFilters()}
+        {/* Table Filters */}
+
+        <Box
+          className="SearchAndFilters-tabletUp"
+          sx={{
+            borderRadius: 'sm',
+            py: 2,
+            display: { xs: 'none', sm: 'flex' },
+            flexWrap: 'wrap',
+            gap: 1.5,
+            '& > *': {
+              minWidth: { xs: '120px', md: '160px' },
+            },
+          }}
+        >
+          
+          <FormControl sx={{ flex: 1 }} size="sm">
+            <FormLabel>Search for order</FormLabel>
+            <Input size="sm" placeholder="Search" startDecorator={<SearchIcon />} />
+          </FormControl>
+
+          {renderFilters()}
+        </Box>
+        {/* Table Container */}
+        
+          <OrderTable />
+          <OrderList />
       </Box>
-      {/* Table Container */}
-      
-        <OrderTable />
-        <OrderList />
-    </Box>
+
+       <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            variant="outlined"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </Button>
+
+          <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
+            Page {page} of {totalPages}
+          </Typography>
+
+          <Button
+            variant="outlined"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </Button>
+        </Box>
+    </React.Fragment>
   );
 }

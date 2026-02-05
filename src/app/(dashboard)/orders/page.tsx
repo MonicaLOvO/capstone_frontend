@@ -34,12 +34,18 @@ export default function OrdersPage() {
         <FormLabel>Status</FormLabel>
         <Select
           size="sm"
-          placeholder="Filter by status"
+          placeholder="All"
           slotProps={{ button: { sx: { whiteSpace: 'nowrap' } } }}
         >
           <Option value="all">All</Option>
-          <Option value="paid">Idle</Option>
-          <Option value="pending">In Progress</Option>
+          <Option value="0">Pending</Option>
+          <Option value="1">Processing</Option>
+          <Option value="2">Shipped</Option>
+          <Option value="3">Delivered</Option>
+          <Option value="4">Cancelled</Option>
+          <Option value="5">Returned</Option>
+          <Option value="6">Completed</Option>
+
         </Select>
       </FormControl>
       <FormControl size="sm">

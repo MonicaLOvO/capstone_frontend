@@ -54,8 +54,18 @@ export default function Login() {
       await signIn(email, password); // 
       router.push("/"); // 
     } catch (err) {
-      setError(err.message || "Login failed");
-    } finally {
+  if (
+    err.code === "auth/user-not-found" ||
+    err.code === "auth/wrong-password" ||
+    err.code === "auth/invalid-credential"
+  ) {
+    setError(
+      "The account does not exist or the email or password entered is incorrect. Please verify your credentials and try again."
+    );
+  } else {
+    setError("Unable to sign in at this time. Please try again later.");
+  }
+} finally {
       setLoading(false);
     }
   };

@@ -14,7 +14,7 @@ export default function DashboardLayout({
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  const userRole: UserRole = "staff"; // later from auth
+  const userRole: UserRole = "manager"; // later from auth
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>

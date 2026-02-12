@@ -247,7 +247,7 @@ export default function OrderTable() {
                 flexShrink: 1,
                 overflow: 'auto',
                 minHeight: 0,
-                maxHeight: 500,
+                maxHeight: 375,
             }}
         >
             <Table

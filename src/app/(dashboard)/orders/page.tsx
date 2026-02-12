@@ -72,7 +72,14 @@ export default function OrdersPage() {
   
   return (
     <React.Fragment>
-      <Box>
+      <Box
+      sx={{
+        flex: 1,          // 👈 Takes remaining space
+        minHeight: 0,     // 👈 CRITICAL for scroll to work
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+      >
         {/* Page Header */}
         <Box
           sx={{

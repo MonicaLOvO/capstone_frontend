@@ -3,17 +3,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {Box,Button,Chip,Input,Option,Select,Sheet,Table,Typography,Modal,ModalDialog,DialogTitle,DialogContent,Stack,} from "@mui/joy";
 
-import { inventoryApi } from "@/app/api/inventory/inventory.api";
+import { inventoryApi } from "@/services/api/inventory/inventory.api";
 import {
   InventoryItemStatusEnum,
   type InventoryListQuery,
   type InventoryItemDTO,
-} from "@/app/api/inventory/inventory.types";
-import { type InventoryItem } from "@/app/api/inventory/inventory.mapper";
+} from "@/services/api/inventory/inventory.types";
+import { type InventoryItem } from "@/services/api/inventory/inventory.mapper";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
-import { InventoryRowMenu } from "@/components/inventory/InventoryRowMenu";
-import { InventoryItemDialog } from "@/components/inventory/InventoryItemDialog";
+import { InventoryRowMenu } from "@/app/(dashboard)/inventory/components/InventoryRowMenu";
+import { InventoryItemDialog } from "@/app/(dashboard)/inventory/components/InventoryItemDialog";
 
 function statusChip(status: string) {
   switch (status) {

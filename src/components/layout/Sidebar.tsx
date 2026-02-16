@@ -24,7 +24,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { navItems } from "@/features/navigation/sidebarConfig";
+import { navItems } from "@/config/navigation";
 import { UserRole } from "@/types/roles";
 
 interface SidebarProps {

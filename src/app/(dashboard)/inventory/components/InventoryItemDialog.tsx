@@ -16,8 +16,8 @@ import {
   Stack,
   Typography,
 } from "@mui/joy";
-import type { InventoryItemDTO } from "@/app/api/inventory/inventory.types";
-import { InventoryItemStatusEnum } from "@/app/api/inventory/inventory.types";
+import type { InventoryItemDTO } from "@/services/api/inventory/inventory.types";
+import { InventoryItemStatusEnum } from "@/services/api/inventory/inventory.types";
 
 type Mode = "create" | "edit";
 

@@ -24,11 +24,12 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { navItems } from "@/features/navigation/sidebarConfig";
+import { navItems } from "@/config/navigation";
+import { usePermissions } from "@/hooks/usePermissions";
 import { UserRole } from "@/types/roles";
 
 interface SidebarProps {
-  userRole: UserRole;
+  userRole: UserRole; //login or auth will still use this ..
   collapsed: boolean;
   onToggleCollapse: () => void;
   onNavigate?: () => void;
@@ -42,7 +43,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
-  const visibleItems = navItems.filter((item) => item.roles.includes(userRole));
+  const { has } = usePermissions(userRole);
+
+  const visibleItems = navItems.filter((item) => has(item.permission));
 
   return (
     <Sheet

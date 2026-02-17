@@ -1,7 +1,22 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import {Box,Button,Chip,Input,Option,Select,Sheet,Table,Typography,Modal,ModalDialog,DialogTitle,DialogContent,Stack,} from "@mui/joy";
+import {
+  Box,
+  Button,
+  Chip,
+  Input,
+  Option,
+  Select,
+  Sheet,
+  Table,
+  Typography,
+  Modal,
+  ModalDialog,
+  DialogTitle,
+  DialogContent,
+  Stack,
+} from "@mui/joy";
 
 import { inventoryApi } from "@/services/api/inventory/inventory.api";
 import {
@@ -14,16 +29,31 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { InventoryRowMenu } from "@/app/(dashboard)/inventory/components/InventoryRowMenu";
 import { InventoryItemDialog } from "@/app/(dashboard)/inventory/components/InventoryItemDialog";
+import { usePermissions } from "@/hooks/usePermissions";
+//import { UserRole } from "@/types/roles";
+import { useAuth } from "@/auth/AuthProvider";
 
 function statusChip(status: string) {
   switch (status) {
     case InventoryItemStatusEnum.InStock:
-      return { label: "In stock", color: "success" as const, variant: "soft" as const };
+      return {
+        label: "In stock",
+        color: "success" as const,
+        variant: "soft" as const,
+      };
     case InventoryItemStatusEnum.LowStock:
-      return { label: "Low stock", color: "warning" as const, variant: "soft" as const };
+      return {
+        label: "Low stock",
+        color: "warning" as const,
+        variant: "soft" as const,
+      };
     case InventoryItemStatusEnum.OutStock:
     default:
-      return { label: "Out of stock", color: "neutral" as const, variant: "soft" as const };
+      return {
+        label: "Out of stock",
+        color: "neutral" as const,
+        variant: "soft" as const,
+      };
   }
 }
 
@@ -32,6 +62,9 @@ function money(n: number) {
 }
 
 export default function InventoryPage() {
+  const { role } = useAuth(); 
+  const { has } = usePermissions(role);
+
   // Filters
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
@@ -68,7 +101,7 @@ export default function InventoryPage() {
 
   const categoryOptions = useMemo(
     () => ["", "Electronics", "Furniture", "Safety", "Supplies", "Tools"],
-    []
+    [],
   );
 
   const statusOptions = useMemo(
@@ -78,7 +111,7 @@ export default function InventoryPage() {
       { value: InventoryItemStatusEnum.LowStock, label: "Low stock" },
       { value: InventoryItemStatusEnum.OutStock, label: "Out of stock" },
     ],
-    []
+    [],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -233,12 +266,16 @@ export default function InventoryPage() {
         </Box>
 
         <Stack direction="row" spacing={1.5}>
-          <Button variant="outlined" color="neutral" onClick={() => setQrOpen(true)}>
-            QR Lookup
-          </Button>
-          <Button color="primary" onClick={() => setCreateOpen(true)}>
-            + Add Product
-          </Button>
+          {has("inventory.qr") && (
+            <Button variant="outlined" onClick={() => setQrOpen(true)}>
+              QR Lookup
+            </Button>
+          )}
+          {has("inventory.create") && (
+            <Button color="primary" onClick={() => setCreateOpen(true)}>
+              + Add Product
+            </Button>
+          )}
         </Stack>
       </Box>
 
@@ -311,7 +348,10 @@ export default function InventoryPage() {
       </Box>
 
       {/* Table */}
-      <Sheet variant="outlined" sx={{ borderRadius: "lg", overflow: "hidden", width: "100%" }}>
+      <Sheet
+        variant="outlined"
+        sx={{ borderRadius: "lg", overflow: "hidden", width: "100%" }}
+      >
         <Box
           sx={{
             px: 2,
@@ -363,7 +403,10 @@ export default function InventoryPage() {
                 <tr>
                   <td colSpan={8}>
                     <Box sx={{ py: 6, textAlign: "center" }}>
-                      <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
+                      <Typography
+                        level="body-sm"
+                        sx={{ color: "text.tertiary" }}
+                      >
                         No results.
                       </Typography>
                     </Box>
@@ -385,26 +428,30 @@ export default function InventoryPage() {
                       <td>{it.location || "—"}</td>
                       <td>{money(it.unitPrice)}</td>
                       <td>
-                        <Chip color={chip.color} variant={chip.variant} size="sm">
+                        <Chip
+                          color={chip.color}
+                          variant={chip.variant}
+                          size="sm"
+                        >
                           {chip.label}
                         </Chip>
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        <InventoryRowMenu
-                          onEdit={() => {
-                            setSelected(it);
-                            setEditOpen(true);
-                          }}
-                          onQr={() => {
-                            // show QR data (or you can open edit and highlight)
-                            setQrValue(it.qrCodeValue || "");
-                            setQrOpen(true);
-                          }}
-                          onDelete={() => {
-                            setSelected(it);
-                            setDeleteOpen(true);
-                          }}
-                        />
+                        {(has("inventory.edit") || has("inventory.delete")) && (
+                          <InventoryRowMenu
+                            onEdit={() => {
+                              if (!has("inventory.edit")) return;
+                              setSelected(it);
+                              setEditOpen(true);
+                            }}
+                            onQr={() => has("inventory.qr") && setQrOpen(true)}
+                            onDelete={() => {
+                              if (!has("inventory.delete")) return;
+                              setSelected(it);
+                              setDeleteOpen(true);
+                            }}
+                          />
+                        )}
                       </td>
                     </tr>
                   );
@@ -487,22 +534,40 @@ export default function InventoryPage() {
 
       {/* Delete confirm */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)}>
-        <ModalDialog variant="outlined" role="alertdialog" sx={{ borderRadius: "lg", width: 420 }}>
+        <ModalDialog
+          variant="outlined"
+          role="alertdialog"
+          sx={{ borderRadius: "lg", width: 420 }}
+        >
           <DialogTitle>Delete item?</DialogTitle>
           <DialogContent>
             <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
-              This action cannot be undone. The item will be removed from inventory.
+              This action cannot be undone. The item will be removed from
+              inventory.
             </Typography>
 
             <Typography sx={{ mt: 1 }} fontWeight={600}>
               {selected?.productName || "Item"}
             </Typography>
 
-            <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ mt: 2 }}>
-              <Button variant="outlined" color="neutral" onClick={() => setDeleteOpen(false)}>
+            <Stack
+              direction="row"
+              justifyContent="flex-end"
+              spacing={1.5}
+              sx={{ mt: 2 }}
+            >
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={() => setDeleteOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button color="danger" loading={deleteSubmitting} onClick={handleDeleteConfirmed}>
+              <Button
+                color="danger"
+                loading={deleteSubmitting}
+                onClick={handleDeleteConfirmed}
+              >
                 Delete
               </Button>
             </Stack>
@@ -527,8 +592,17 @@ export default function InventoryPage() {
               autoFocus
             />
 
-            <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ mt: 2 }}>
-              <Button variant="outlined" color="neutral" onClick={() => setQrOpen(false)}>
+            <Stack
+              direction="row"
+              justifyContent="flex-end"
+              spacing={1.5}
+              sx={{ mt: 2 }}
+            >
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={() => setQrOpen(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={handleQrLookup}>Find Item</Button>

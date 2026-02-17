@@ -1,92 +1,91 @@
-import { UserRole } from '@/types/roles';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import MonitorIcon from '@mui/icons-material/Monitor';
-import InsightsIcon from '@mui/icons-material/Insights';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import PeopleIcon from '@mui/icons-material/People';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import { ReactNode } from 'react';
-
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import InventoryIcon from "@mui/icons-material/Inventory";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import MonitorIcon from "@mui/icons-material/Monitor";
+import InsightsIcon from "@mui/icons-material/Insights";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import PeopleIcon from "@mui/icons-material/People";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import { ReactNode } from "react";
+import { Permission } from "@/types/permissions";
 
 export interface NavItem {
   label: string;
   href: string;
-  roles: UserRole[];
+  permission: Permission;
   icon: ReactNode;
   section?: string;
 }
 
 export const navItems: NavItem[] = [
-  // Core
+  // ===== MAIN =====   //We attach a basic permission everyone has (inventory.view) so staff can still enter app.
   {
-    label: 'Dashboard',
-    href: '/dashboard',
-    roles: ['manager', 'staff', 'admin'],
+    label: "Dashboard",
+    href: "/dashboard",
+    permission: "inventory.view", // basic access permission
     icon: <DashboardIcon />,
-    section: 'Main',
+    section: "Main",
   },
   {
-    label: 'Inventory',
-    href: '/inventory',
-    roles: ['manager', 'staff', 'admin'],
+    label: "Inventory",
+    href: "/inventory",
+    permission: "inventory.view",
     icon: <InventoryIcon />,
-    section: 'Main',
+    section: "Main",
   },
   {
-    label: 'Orders',
-    href: '/orders',
-    roles: ['manager', 'staff', 'admin'],
+    label: "Orders",
+    href: "/orders",
+    permission: "orders.view",
     icon: <ReceiptLongIcon />,
-    section: 'Main',
+    section: "Main",
   },
 
-  // Manager
+  // ===== MANAGEMENT =====
   {
-    label: 'Activity Monitor',
-    href: '/activity',
-    roles: ['manager'],
+    label: "Activity Monitor",
+    href: "/activity",
+    permission: "tasks.view.all", //admin + manager only
     icon: <MonitorIcon />,
-    section: 'Management',
+    section: "Management",
   },
   {
-    label: 'Reports',
-    href: '/reports',
-    roles: ['manager'],
+    label: "Reports",
+    href: "/reports",
+    permission: "reports.view",
     icon: <AssessmentIcon />,
-    section: 'Management',
+    section: "Management",
   },
   {
-    label: 'AI Insights',
-    href: '/ai-insights',
-    roles: ['manager'],
+    label: "AI Insights",
+    href: "/ai-insights",
+    permission: "ai.view",
     icon: <InsightsIcon />,
-    section: 'Management',
+    section: "Management",
   },
   {
-    label: 'Staff Management',
-    href: '/staff-management',
-    roles: ['manager'],
+    label: "Staff Management",
+    href: "/staff-management",
+    permission: "staff.view",
     icon: <PeopleIcon />,
-    section: 'Management',
+    section: "Management",
   },
 
-  // Staff
+  // ===== TASKS =====
   {
-    label: 'My Tasks',
-    href: '/my-tasks',
-    roles: ['staff'],
+    label: "My Tasks",
+    href: "/my-tasks",
+    permission: "tasks.view.own", //staff + manager
     icon: <AssignmentIcon />,
-    section: 'Tasks',
+    section: "Tasks",
   },
 
-  // Admin
+  // ===== ADMIN =====
   {
-    label: 'User Management',
-    href: '/user-management',
-    roles: ['admin'],
+    label: "User Management",
+    href: "/user-management",
+    permission: "users.view",
     icon: <PeopleIcon />,
-    section: 'Admin',
+    section: "Admin",
   },
 ];

@@ -1,18 +1,23 @@
 'use client';
 
-import { Box, Typography, Button, Sheet, FormControl, Input, FormLabel, Select, Option } from '@mui/joy';
+import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option, Breadcrumbs, Link } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import OrderTable from './components/OrderTable';
 import OrderList from './components/OrderList';
-
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
+import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 
 export default function OrdersPage() {
   
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [statusFilter, setStatusFilter] = useState<'all' | '0' | '1'>('all');
 
   const [total, setTotal] = useState(0);
+  const handleTotalChange = useCallback((nextTotal: number) => {
+    setTotal(nextTotal);
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   // const { isAuthenticated } = useAuth();
@@ -35,30 +40,21 @@ export default function OrdersPage() {
         <Select
           size="sm"
           placeholder="All"
+          value={statusFilter}
+          onChange={(_, value) => {
+            const next = (value ?? 'all') as 'all' | '0' | '1';
+            setStatusFilter(next);
+            setPage(1);
+          }}
           slotProps={{ button: { sx: { whiteSpace: 'nowrap' } } }}
         >
           <Option value="all">All</Option>
-          <Option value="0">Pending</Option>
-          <Option value="1">Processing</Option>
-          <Option value="2">Shipped</Option>
-          <Option value="3">Delivered</Option>
-          <Option value="4">Cancelled</Option>
-          <Option value="5">Returned</Option>
-          <Option value="6">Completed</Option>
+          <Option value="1">Pending</Option>
+          <Option value="0">Processing</Option>
 
         </Select>
       </FormControl>
-      <FormControl size="sm">
-
-        {/* Category Filter */}
-        <FormLabel>Category</FormLabel>
-        <Select size="sm" placeholder="All">
-          <Option value="all">All</Option>
-          <Option value="refund">Refund</Option>
-          <Option value="purchase">Purchase</Option>
-          <Option value="debit">Debit</Option>
-        </Select>
-      </FormControl>
+      
       <FormControl size="sm">
 
         {/* Customer Filter */}
@@ -74,12 +70,41 @@ export default function OrdersPage() {
     <React.Fragment>
       <Box
       sx={{
-        flex: 1,          // 👈 Takes remaining space
-        minHeight: 0,     // 👈 CRITICAL for scroll to work
+        flex: 1,          
         display: 'flex',
         flexDirection: 'column',
       }}
       >
+
+        {/* Page Path */}
+
+        <Breadcrumbs
+          size="sm"
+          aria-label="breadcrumbs"
+          separator={<ChevronRightRoundedIcon fontSize="small" />}
+          sx={{ pl: 0 }}
+        >
+              <Link
+                underline="none"
+                color="neutral"
+                href="#some-link"
+                aria-label="Home"
+              >
+                <HomeRoundedIcon />
+              </Link>
+              <Link
+                underline="hover"
+                color="neutral"
+                href="/dashboard"
+                sx={{ fontSize: 12, fontWeight: 500 }}
+              >
+                Dashboard
+              </Link>
+              <Typography color="primary" sx={{ fontWeight: 500, fontSize: 12 }}>
+                Orders
+              </Typography>
+            </Breadcrumbs>
+            
         {/* Page Header */}
         <Box
           sx={{
@@ -122,7 +147,12 @@ export default function OrdersPage() {
         </Box>
         {/* Table Container */}
         
-          <OrderTable />
+          <OrderTable
+            page={page}
+            pageSize={pageSize}
+            statusFilter={statusFilter}
+            onTotalChange={handleTotalChange}
+          />
           <OrderList />
       </Box>
 

@@ -6,8 +6,8 @@ import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import BlockIcon from '@mui/icons-material/Block';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import { useEffect, useMemo, useState } from 'react';
-import { ordersApi } from '@/app/api/orders/orders.api';
-import type { Order } from '@/app/api/orders/orders.mapper';
+import { ordersApi } from '@/services/api/orders/orders.api';
+import type { Order } from '@/services/api/orders/orders.mapper';
 
 interface RowData {
   id: string;
@@ -16,6 +16,7 @@ interface RowData {
   customer: {
     name: string;
     email: string;
+    initial: string;
   };
 }
 

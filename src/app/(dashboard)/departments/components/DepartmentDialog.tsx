@@ -1,0 +1,121 @@
+"use client";
+
+import {
+  Modal,
+  ModalDialog,
+  DialogTitle,
+  DialogContent,
+  FormControl,
+  FormLabel,
+  Input,
+  Button,
+  Stack,
+  Typography,
+} from "@mui/joy";
+import { useState } from "react";
+import { useEffect } from "react";
+
+export interface DepartmentForm {
+  name: string;
+  description: string;
+}
+
+export function DepartmentDialog({
+  open,
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  initial?: DepartmentForm | null;
+  onClose: () => void;
+  onSubmit: (data: DepartmentForm) => Promise<void>;
+}) {
+  const [form, setForm] = useState<DepartmentForm>(() => ({
+    name: initial?.name ?? "",
+    description: initial?.description ?? "",
+  }));
+
+  // IMPORTANT:
+  // when dialog closes, React unmounts and remounts
+  // so state resets automatically — no effect needed
+
+  if (!open) return null;
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <ModalDialog
+        size="md"
+        sx={{
+          width: 520,
+          borderRadius: "lg",
+        }}
+      >
+        <DialogTitle>
+          <Stack spacing={0.5}>
+            <Typography level="h3">
+              {initial ? "Edit Department" : "Add Department"}
+            </Typography>
+
+            <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
+              Departments organize users and permissions across the system.
+            </Typography>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl required>
+              <FormLabel>Department Name</FormLabel>
+              <Input
+                placeholder="e.g. IT, Sales, Warehouse"
+                value={form.name}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Description</FormLabel>
+              <Input
+                placeholder="Optional description"
+                value={form.description}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    description: e.target.value,
+                  }))
+                }
+              />
+            </FormControl>
+
+            <Stack
+              direction="row"
+              justifyContent="flex-end"
+              spacing={1.5}
+              sx={{ pt: 1 }}
+            >
+              <Button variant="outlined" onClick={onClose}>
+                Cancel
+              </Button>
+
+              <Button
+                color="primary"
+                onClick={() => {
+                  if (!form.name.trim()) return;
+                  onSubmit({
+                    name: form.name.trim(),
+                    description: form.description.trim(),
+                  });
+                }}
+              >
+                Save Department
+              </Button>
+            </Stack>
+          </Stack>
+        </DialogContent>
+      </ModalDialog>
+    </Modal>
+  );
+}

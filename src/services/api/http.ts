@@ -1,4 +1,5 @@
 import type { ApiResponse } from "./types";
+import { clearToken, getToken } from "@/auth/token";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -25,23 +26,40 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
+  const token = getToken();
+
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     ...options,
   });
+  
+  if (res.status === 401) {
+    clearToken();
+    
+    // login page not ready yet → safe fallback
+    window.location.href = "/";
+    //   window.location.href = "/login";
+
+    throw new Error("Session expired");
+  }
 
   const body = await parseJsonSafe(res);
 
   if (!res.ok) {
     if (hasApiShape<unknown>(body)) {
-      throw new Error((body.Message as string) || `Request failed (${res.status})`);
+      throw new Error(
+        (body.Message as string) || `Request failed (${res.status})`,
+      );
     }
-    throw new Error(typeof body === "string" ? body : `Request failed (${res.status})`);
+    throw new Error(
+      typeof body === "string" ? body : `Request failed (${res.status})`,
+    );
   }
 
   if (!hasApiShape<T>(body)) {

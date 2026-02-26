@@ -1,6 +1,7 @@
 import { ApiUser } from "./users.types";
 import { Person } from "@/app/(dashboard)/people/components/PeopleTable";
 
+// Mapper converts backend to frontend shape ....
 export function mapUser(dto: ApiUser): Person {
   const roleName = dto.Role?.RoleName?.toLowerCase();
 

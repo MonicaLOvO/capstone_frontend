@@ -21,11 +21,13 @@ export const usersApi = {
       ...(query.DepartmentName && { DepartmentName: query.DepartmentName }),
     });
 
+    //send request using centralised http client ..
     return http.raw<ApiUser[]>(
       `${BASE_URL}/list?${params.toString()}`,
     ) as Promise<UsersListResponse>;
   },
 
+  // API definitions ....
   async create(payload: SaveUserDTO) {
     return http.data<string>(BASE_URL, {
       method: "POST",

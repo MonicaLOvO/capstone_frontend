@@ -4,7 +4,8 @@ import { Box, Drawer } from "@mui/joy";
 import React from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
-import { UserRole } from "@/types/roles";
+//import { UserRole } from "@/types/roles";
+import { useAuth } from "@/auth/AuthProvider";
 
 export default function DashboardLayout({
   children,
@@ -14,10 +15,11 @@ export default function DashboardLayout({
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  const userRole: UserRole = "staff"; // later from auth
+  //const userRole: UserRole = "manager"; // later from auth
+  const { role } = useAuth();
 
   return (
-    <Box sx={{ display: "flex", height: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       {/* Desktop Sidebar */}
       <Box
         sx={{
@@ -28,7 +30,7 @@ export default function DashboardLayout({
         }}
       >
         <Sidebar
-          userRole={userRole}
+          userRole={role}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed(!collapsed)}
         />
@@ -49,7 +51,7 @@ export default function DashboardLayout({
         }}
       >
         <Sidebar
-          userRole={userRole}
+          userRole={role}
           collapsed={false}
           onToggleCollapse={() => {}}
           onNavigate={() => setMobileOpen(false)}

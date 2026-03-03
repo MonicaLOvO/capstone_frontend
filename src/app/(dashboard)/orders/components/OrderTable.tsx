@@ -1,6 +1,6 @@
 'use client';
 
-import { Checkbox, Box, Sheet, Table, Typography, Chip, Link, Avatar } from '@mui/joy';
+import { Checkbox, Box, Sheet, Table, Typography, Chip, Link } from '@mui/joy';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import BlockIcon from '@mui/icons-material/Block';
@@ -26,8 +26,13 @@ type OrderTableProps = {
   page: number;
   pageSize: number;
   statusFilter: 'all' | '0' | '1';
+  search: string;
   onTotalChange: (total: number) => void;
 };
+
+function normalize(value: string): string {
+  return value.trim().toLowerCase();
+}
 
 function toStatusLabel(status: string): RowData['status'] {
   if (status === '0') return 'Processing';
@@ -76,7 +81,7 @@ function getComparator<Key extends PropertyKey>(
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
-export default function OrderTable({ page, pageSize, statusFilter, onTotalChange }: OrderTableProps) {
+export default function OrderTable({ page, pageSize, statusFilter, search, onTotalChange }: OrderTableProps) {
   const [order, setOrder] = useState<SortOrder>('desc');
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [rows, setRows] = useState<RowData[]>([]);
@@ -97,9 +102,49 @@ export default function OrderTable({ page, pageSize, statusFilter, onTotalChange
           OrderStatus: statusFilter === 'all' ? undefined : statusFilter,
         });
 
+        const term = normalize(search);
+        const matchesTerm = (order: Order): boolean => {
+          if (!term) return true;
+
+          return (
+            normalize(order.id).includes(term) ||
+            normalize(order.orderType).includes(term) ||
+            normalize(order.customerName).includes(term) ||
+            normalize(order.customerEmail).includes(term)
+          );
+        };
+
+        let items = response.items;
+        let total = response.total ?? 0;
+
+        if (term) {
+          const [byId, byType] = await Promise.all([
+            ordersApi.list({
+              Page: page,
+              PageSize: pageSize,
+              OrderStatus: statusFilter === 'all' ? undefined : statusFilter,
+              Id: search.trim(),
+            }),
+            ordersApi.list({
+              Page: page,
+              PageSize: pageSize,
+              OrderStatus: statusFilter === 'all' ? undefined : statusFilter,
+              OrderType: search.trim(),
+            }),
+          ]);
+
+          const merged = new Map<string, Order>();
+          [...response.items, ...byId.items, ...byType.items].forEach((item) => {
+            if (matchesTerm(item)) merged.set(item.id, item);
+          });
+
+          items = Array.from(merged.values());
+          total = items.length;
+        }
+
         if (cancelled) return;
-        setRows(response.items.map(mapOrderToRow));
-        onTotalChange(response.total ?? 0);
+        setRows(items.map(mapOrderToRow));
+        onTotalChange(total);
       } catch (err) {
         if (cancelled) return;
         setRows([]);
@@ -114,7 +159,7 @@ export default function OrderTable({ page, pageSize, statusFilter, onTotalChange
     return () => {
       cancelled = true;
     };
-  }, [onTotalChange, page, pageSize, statusFilter]);
+  }, [onTotalChange, page, pageSize, search, statusFilter]);
 
   useEffect(() => {
     setSelected((ids) => ids.filter((id) => rows.some((row) => row.id === id)));

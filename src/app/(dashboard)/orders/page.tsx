@@ -1,23 +1,43 @@
 'use client';
 
-import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option, Breadcrumbs, Link } from '@mui/joy';
+import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option, Breadcrumbs, Link, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
 import React, { useCallback, useState } from 'react';
 import OrderTable from './components/OrderTable';
 import OrderList from './components/OrderList';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
+import { OrderDialog } from './components/OrderDialog';
+import { ordersApi } from '@/services/api/orders/orders.api';
+import type { UpsertOrderDTO } from '@/services/api/orders/orders.types';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 export default function OrdersPage() {
   
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [statusFilter, setStatusFilter] = useState<'all' | '0' | '1'>('all');
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 350);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [total, setTotal] = useState(0);
   const handleTotalChange = useCallback((nextTotal: number) => {
     setTotal(nextTotal);
   }, []);
+
+  async function handleCreate(payload: UpsertOrderDTO) {
+    setSubmitting(true);
+    try {
+      await ordersApi.create(payload);
+      setPage(1);
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   // const { isAuthenticated } = useAuth();
@@ -116,9 +136,16 @@ export default function OrdersPage() {
         >
           <Typography level="h2">Orders</Typography>
 
-          <Button variant="solid" color="primary">
-            Download PDF
-          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button variant="solid" color="primary">
+              Download PDF
+            </Button>
+
+            <Button color="primary" variant="solid" onClick={() => setCreateOpen(true)}>
+              + Add Order
+            </Button>
+          </Stack>
+          
         </Box>
         
 
@@ -140,7 +167,16 @@ export default function OrdersPage() {
           
           <FormControl sx={{ flex: 1 }} size="sm">
             <FormLabel>Search for order</FormLabel>
-            <Input size="sm" placeholder="Search" startDecorator={<SearchIcon />} />
+            <Input
+              size="sm"
+              placeholder="Search by order ID, type, customer, or email"
+              startDecorator={<SearchIcon />}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
           </FormControl>
 
           {renderFilters()}
@@ -148,9 +184,11 @@ export default function OrdersPage() {
         {/* Table Container */}
         
           <OrderTable
+            key={refreshKey}
             page={page}
             pageSize={pageSize}
             statusFilter={statusFilter}
+            search={debouncedSearch}
             onTotalChange={handleTotalChange}
           />
           <OrderList />
@@ -189,6 +227,13 @@ export default function OrdersPage() {
             Next
           </Button>
         </Box>
+
+      <OrderDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={handleCreate}
+        submitting={submitting}
+      />
     </React.Fragment>
   );
 }

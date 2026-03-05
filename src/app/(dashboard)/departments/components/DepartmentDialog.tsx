@@ -14,6 +14,7 @@ import {
 } from "@mui/joy";
 import { useState } from "react";
 import { useEffect } from "react";
+import { validateDepartment, DepartmentInput } from "@/validation/department.validation";
 
 export interface DepartmentForm {
   name: string;
@@ -35,6 +36,9 @@ export function DepartmentDialog({
     name: initial?.name ?? "",
     description: initial?.description ?? "",
   }));
+
+  const [errors, setErrors] =
+  useState<Partial<Record<keyof DepartmentInput, string>>>({});
 
   // IMPORTANT:
   // when dialog closes, React unmounts and remounts
@@ -70,17 +74,24 @@ export function DepartmentDialog({
               <Input
                 placeholder="e.g. IT, Sales, Warehouse"
                 value={form.name}
+                error={!!errors.name}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, name: e.target.value }))
                 }
               />
+              {errors.name && (
+                <Typography level="body-xs" color="danger">
+                  {errors.name}
+                </Typography>
+              )}
             </FormControl>
 
-            <FormControl>
+            <FormControl error={!!errors.description}>
               <FormLabel>Description</FormLabel>
               <Input
-                placeholder="Optional description"
+                placeholder="Optional description (max 200 characters)"
                 value={form.description}
+                error={!!errors.description}
                 onChange={(e) =>
                   setForm((p) => ({
                     ...p,
@@ -88,6 +99,11 @@ export function DepartmentDialog({
                   }))
                 }
               />
+              {errors.description && (
+                <Typography level="body-xs" color="danger">
+                  {errors.description}
+                </Typography>
+              )}
             </FormControl>
 
             <Stack
@@ -103,7 +119,13 @@ export function DepartmentDialog({
               <Button
                 color="primary"
                 onClick={() => {
-                  if (!form.name.trim()) return;
+                  // if (!form.name.trim()) return;
+
+                  const validation = validateDepartment(form);
+                  setErrors(validation);
+
+                  if (Object.keys(validation).length > 0) return;
+
                   onSubmit({
                     name: form.name.trim(),
                     description: form.description.trim(),

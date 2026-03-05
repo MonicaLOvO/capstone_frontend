@@ -1,6 +1,6 @@
 "use client";
 
-import { Drawer, Box, Typography, IconButton } from "@mui/joy";
+import { Drawer, Box, Typography, IconButton, Alert } from "@mui/joy";
 import CloseIcon from "@mui/icons-material/Close";
 import { Person } from "../PeopleTable";
 import { PersonForm } from "./PersonForm";
@@ -9,10 +9,14 @@ interface Props {
   open: boolean;
   mode: "create" | "edit";
   person?: Person | null;
-  currentUserRole: Person["role"]; 
+  currentUserRole: Person["role"];
   departments: { id: string; name: string }[];
+  /** Only roles that exist in DB (from GET /api/role/list) */
+  availableRoles: { role: Person["role"]; label: string }[];
   onClose: () => void;
   onSubmit: (data: Partial<Person>) => void;
+  /** Shown when API (create/update) fails */
+  submitError?: string | null;
 }
 
 export function PersonDrawer({
@@ -21,9 +25,10 @@ export function PersonDrawer({
   person,
   currentUserRole,
   departments,
+  availableRoles,
   onClose,
   onSubmit,
-
+  submitError,
 }: Props) {
   return (
     <Drawer
@@ -58,11 +63,18 @@ export function PersonDrawer({
           </IconButton>
         </Box>
 
+        {submitError && (
+          <Alert color="danger" sx={{ mb: 2 }}>
+            {submitError}
+          </Alert>
+        )}
+
         <PersonForm
           key={person?.id ?? "create"}
           mode={mode}
           person={person}
           departments={departments}
+          availableRoles={availableRoles}
           currentUserRole={currentUserRole}
           onSubmit={onSubmit}
         />

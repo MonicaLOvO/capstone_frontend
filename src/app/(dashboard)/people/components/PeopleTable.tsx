@@ -134,7 +134,16 @@ export function PeopleTable({
                     </td>
 
                     <td>
-                      <Chip size="sm" variant="soft">
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        sx={{
+                          minWidth: 58,
+                          display: "inline-flex",
+                          justifyContent: "center",
+                          "& .MuiChip-label": { textAlign: "center" },
+                        }}
+                      >
                         {p.role}
                       </Chip>
                     </td>
@@ -144,15 +153,19 @@ export function PeopleTable({
                         size="sm"
                         color={p.status === "active" ? "success" : "danger"}
                         variant="soft"
-                        sx={
-                          p.status === "inactive"
+                        sx={{
+                          minWidth: 58,
+                          display: "inline-flex",
+                          justifyContent: "center",
+                          "& .MuiChip-label": { textAlign: "center" },
+                          ...(p.status === "inactive"
                             ? {
                                 bgcolor: "danger.softBg",
                                 color: "danger.softColor",
-                                opacity: 0.75, // makes it softer than delete red
+                                opacity: 0.75,
                               }
-                            : undefined
-                        }
+                            : {}),
+                        }}
                       >
                         {p.status}
                       </Chip>

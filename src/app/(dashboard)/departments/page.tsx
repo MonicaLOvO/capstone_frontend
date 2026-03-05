@@ -115,21 +115,37 @@ export default function DepartmentsPage() {
             {departments.map((d) => (
               <tr key={d.Id}>
                 <td>{d.DepartmentName}</td>
-                <td>{d.Description || "—"}</td>
+                <td>
+                  <Box
+                    sx={{
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                      minWidth: 0,
+                    }}
+                  >
+                    <Typography level="body-sm" sx={{ whiteSpace: "pre-wrap" }}>
+                      {d.Description || "—"}
+                    </Typography>
+                  </Box>
+                </td>
                 <td>
                   <Chip
                     size="sm"
                     color={d.IsActive ? "success" : "danger"}
                     variant="soft"
-                    sx={
-                      !d.IsActive
+                    sx={{
+                      minWidth: 58,
+                      display: "inline-flex",
+                      justifyContent: "center",
+                      "& .MuiChip-label": { textAlign: "center" },
+                      ...(!d.IsActive
                         ? {
                             bgcolor: "danger.softBg",
                             color: "danger.softColor",
                             opacity: 0.75,
                           }
-                        : undefined
-                    }
+                        : {}),
+                    }}
                   >
                     {d.IsActive ? "Active" : "Inactive"}
                   </Chip>

@@ -18,7 +18,7 @@ import {
 } from "@mui/joy";
 import { usersApi } from "@/services/api/users/users.api";
 import { mapUser } from "@/services/api/users/users.mapper";
-import { roleIdMap } from "@/services/api/users/users.roleMap";
+import { rolesApi } from "@/services/api/roles/roles.api";
 import { departmentsApi } from "@/services/api/departments/departments.api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -31,6 +31,15 @@ export default function PeoplePage() {
 
   const [departments, setDepartments] = useState<
     { id: string; name: string; isActive: boolean }[]
+  >([]);
+
+  /** Role IDs from API – only roles that exist in DB (avoids FK errors) */
+  const [roleIdMap, setRoleIdMap] = useState<
+    Partial<Record<Person["role"], string>>
+  >({});
+  /** Role options for Add/Edit Person dropdown (only roles that exist in DB) */
+  const [availableRoles, setAvailableRoles] = useState<
+    { role: Person["role"]; label: string }[]
   >([]);
 
   
@@ -185,6 +194,31 @@ export default function PeoplePage() {
           isActive: d.IsActive,
         })),
       );
+
+      // Fetch roles so we use real IDs from DB (avoids RoleId FK error)
+      const rolesResponse = await rolesApi.list();
+      const roleList = rolesResponse.Data ?? [];
+      const backendToFrontend: Record<string, Person["role"]> = {
+        SuperAdmin: "admin",
+        Manager: "manager",
+        Staff: "staff",
+      };
+      const labels: Record<Person["role"], string> = {
+        admin: "Admin",
+        manager: "Manager",
+        staff: "Staff",
+      };
+      const map: Partial<Record<Person["role"], string>> = {};
+      for (const r of roleList) {
+        const key = backendToFrontend[r.RoleName];
+        if (key) map[key] = r.Id;
+      }
+      setRoleIdMap(map);
+      setAvailableRoles(
+        (["admin", "manager", "staff"] as const)
+          .filter((role) => map[role])
+          .map((role) => ({ role, label: labels[role] })),
+      );
     } finally {
       setLoading(false);
     }
@@ -213,6 +247,7 @@ export default function PeoplePage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -312,39 +347,46 @@ export default function PeoplePage() {
         mode={editingPerson ? "edit" : "create"}
         person={editingPerson}
         departments={selectableDepartments}
+        availableRoles={availableRoles}
         currentUserRole={role}
-        onClose={() => setDrawerOpen(false)}
-        onSubmit={async (data) => {
-          if (editingPerson) {
-            // EDIT
-            await usersApi.update(editingPerson.id, {
-              FirstName: data.firstName,
-              LastName: data.lastName,
-              Email: data.email,
-              Username: data.email,
-              RoleId: data.role ? roleIdMap[data.role] : undefined,
-              DepartmentId: getDepartmentId(data.department),
-              IsActive: data.status === "active",
-            });
-
-            await loadUsers();
-          } else {
-            await usersApi.create({
-              FirstName: data.firstName,
-              LastName: data.lastName,
-              Email: data.email,
-              Username: data.email,
-              Password: "Temp123",
-              RoleId: data.role ? roleIdMap[data.role] : undefined,
-              DepartmentId: getDepartmentId(data.department),
-              IsActive: data.status === "active",
-            });
-
-            await loadUsers(); // reload from backend
-          }
-
+        submitError={submitError}
+        onClose={() => {
           setDrawerOpen(false);
-          setEditingPerson(null);
+          setSubmitError(null);
+        }}
+        onSubmit={async (data) => {
+          setSubmitError(null);
+          try {
+            if (editingPerson) {
+              await usersApi.update(editingPerson.id, {
+                FirstName: data.firstName,
+                LastName: data.lastName,
+                Email: data.email,
+                Username: data.email,
+                RoleId: data.role ? roleIdMap[data.role] : undefined,
+                DepartmentId: getDepartmentId(data.department),
+                IsActive: data.status === "active",
+              });
+            } else {
+              await usersApi.create({
+                FirstName: data.firstName,
+                LastName: data.lastName,
+                Email: data.email,
+                Username: data.email,
+                Password: "Temp123",
+                RoleId: data.role ? roleIdMap[data.role] : undefined,
+                DepartmentId: getDepartmentId(data.department),
+                IsActive: data.status === "active",
+              });
+            }
+            await loadUsers();
+            setDrawerOpen(false);
+            setEditingPerson(null);
+          } catch (err) {
+            setSubmitError(
+              err instanceof Error ? err.message : "Failed to save user. Please try again."
+            );
+          }
         }}
       />
 

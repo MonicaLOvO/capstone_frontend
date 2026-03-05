@@ -1,4 +1,8 @@
 export type Permission =
+  // Core
+  | "people.view"
+  | "dashboard.view"
+  
   // Inventory
   | "inventory.view"
   | "inventory.create"
@@ -26,7 +30,7 @@ export type Permission =
 
   // Tasks
   | "tasks.view.all" //management dashboard
-  | "tasks.view.own"  // My tasks page
+  | "tasks.view.own" // My tasks page
   | "tasks.update.status"
   | "tasks.assign"
   | "tasks.edit"

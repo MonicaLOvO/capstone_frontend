@@ -4,6 +4,7 @@ import { Box, Drawer } from "@mui/joy";
 import React from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import AuthGuard from "@/components/AuthGuard";
 //import { UserRole } from "@/types/roles";
 import { useAuth } from "@/auth/AuthProvider";
 
@@ -15,10 +16,18 @@ export default function DashboardLayout({
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  //const userRole: UserRole = "manager"; // later from auth
-  const { role } = useAuth();
+  /**
+   * Get user from authentication context
+   */
+  const { user } = useAuth();
 
+  /**
+   * Extract role safely
+   */
+  const role = user?.role;
   return (
+    <AuthGuard>
+
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       {/* Desktop Sidebar */}
       <Box
@@ -82,5 +91,6 @@ export default function DashboardLayout({
         </Box>
       </Box>
     </Box>
+    </AuthGuard>
   );
 }

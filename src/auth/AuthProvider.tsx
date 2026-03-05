@@ -16,7 +16,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // TEMP MOCK USER (later backend replaces this)
   const user: User = {
     id: "1",
-    name: "John",
+    name: "Super Admin",
     role: "admin",
   };
 

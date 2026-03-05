@@ -191,7 +191,7 @@ export default function Sidebar({
 
             {!collapsed && (
               <Box>
-                <Typography level="body-sm">John</Typography>
+                <Typography level="body-sm">Super Admin</Typography>
                 <Typography level="body-xs" color="neutral">
                   {userRole}
                 </Typography>

@@ -3,6 +3,8 @@ import { Permission } from "@/types/permissions";
 
 export const rolePermissions: Record<UserRole, Permission[]> = {
   admin: [
+    "dashboard.view",
+
     "inventory.view",
     "inventory.create",
     "inventory.edit",
@@ -14,6 +16,7 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "orders.edit",
     "orders.delete",
 
+    "people.view",
     "users.view",
     "users.create",
     "users.edit",
@@ -31,6 +34,8 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
   ],
 
   manager: [
+    "dashboard.view",
+
     "inventory.view",
     "inventory.create",
     "inventory.edit",
@@ -42,7 +47,8 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "orders.edit",
     "orders.delete",
 
-    "users.view", //read-only visibility
+    "people.view",
+    //"users.view", //read-only visibility
     "staff.view",
     "staff.create",
     "staff.edit",
@@ -59,6 +65,8 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
   ],
 
   staff: [
+    "dashboard.view",
+
     "inventory.view",
     "inventory.qr",
     "orders.view",

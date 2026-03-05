@@ -2,7 +2,7 @@
 
 import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option, Breadcrumbs, Link, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import OrderTable from './components/OrderTable';
 import OrderList from './components/OrderList';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
@@ -11,6 +11,8 @@ import { OrderDialog } from './components/OrderDialog';
 import { ordersApi } from '@/services/api/orders/orders.api';
 import type { UpsertOrderDTO } from '@/services/api/orders/orders.types';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import router from 'next/router';
+import { useAuth } from '@/auth/AuthProvider';
 
 export default function OrdersPage() {
   
@@ -44,9 +46,9 @@ export default function OrdersPage() {
 
   // Check if user is logged in
     // useEffect(() => {
-    //     if (isAuthenticated) {
-    //         router.replace('/(tabs)/home');
-    //     }
+        // if (isAuthenticated) {
+            // router.replace('/(tabs)/home');
+        // }
     // }, [isAuthenticated, router]);
 
     

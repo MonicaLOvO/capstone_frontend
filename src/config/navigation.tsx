@@ -8,6 +8,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ReactNode } from "react";
 import { Permission } from "@/types/permissions";
+import ApartmentIcon  from "@mui/icons-material/Apartment";
 
 export interface NavItem {
   label: string;
@@ -22,7 +23,7 @@ export const navItems: NavItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
-    permission: "inventory.view", // basic access permission
+    permission: "dashboard.view", // basic access permission
     icon: <DashboardIcon />,
     section: "Main",
   },
@@ -64,13 +65,26 @@ export const navItems: NavItem[] = [
     section: "Management",
   },
   {
-    label: "Staff Management",
-    href: "/staff-management",
-    permission: "staff.view",
+    label: "People Management",      //same route, different permission visibility....
+    href: "/people",
+    permission: "people.view", // managers
     icon: <PeopleIcon />,
     section: "Management",
   },
-
+  {
+    label: "Departments",      
+    href: "/departments",
+    permission: "people.view", 
+    icon: <ApartmentIcon />,
+    section: "Management",
+  },
+  // {
+  //   label: "People Management",
+  //   href: "/people",
+  //   permission: "users.view", // admin
+  //   icon: <PeopleIcon />,
+  //   section: "Admin",
+  // },
   // ===== TASKS =====
   {
     label: "My Tasks",
@@ -78,14 +92,5 @@ export const navItems: NavItem[] = [
     permission: "tasks.view.own", //staff + manager
     icon: <AssignmentIcon />,
     section: "Tasks",
-  },
-
-  // ===== ADMIN =====
-  {
-    label: "User Management",
-    href: "/user-management",
-    permission: "users.view",
-    icon: <PeopleIcon />,
-    section: "Admin",
   },
 ];

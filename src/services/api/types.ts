@@ -9,3 +9,4 @@ export type PagedApiResponse<T> = ApiResponse<T[]> & {
   Page: number;
   PageSize: number;
 };
+

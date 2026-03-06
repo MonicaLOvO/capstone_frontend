@@ -183,6 +183,7 @@ export default function ProfilePage() {
                   <Input
                     size="sm"
                     value={formData.role}
+                    readOnly
                     onChange={handleChange("role")}
                   />
                 </FormControl>

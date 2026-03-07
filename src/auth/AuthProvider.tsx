@@ -1,7 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { UserRole } from "@/types/roles";
+import { clearSession } from "@/auth/session";
 
 /**
  * Frontend User model
@@ -21,6 +23,8 @@ type AuthContextType = {
   loading: boolean;
   login: (token: string) => Promise<void>;
   logout: () => void;
+  /** Current user role (convenience so components can use const { role } = useAuth()) */
+  role: UserRole | undefined;
 };
 
 
@@ -33,94 +37,11 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const TOKEN_KEY = "wms_token";
 
   /**
- * Fetch logged-in user information from backend
- * using the JWT token stored in the browser.
- */
-async function fetchUser(token: string) {
-  try {
-
-    /**
-     * Call backend endpoint to get current user
-     */
-    const res = await fetch("http://localhost:4000/api/auth/me", {
-      headers: {
-        Authorization: `Bearer ${token}`, // send JWT token
-      },
-    });
-
-    /**
-     * If backend says unauthorized
-     * the token is invalid or expired
-     */
-    if (!res.ok) {
-      throw new Error("Unauthorized");
-    }
-
-    /**
-     * Parse JSON response
-     */
-    const data = await res.json();
-
-    /**
-     * Example backend response:
-     * 
-     * {
-     *   Data: {
-     *     id: "1",
-     *     name: "Super Admin",
-     *     role: "ADMIN"
-     *   }
-     * }
-     */
-
-    const userData = data?.Data;
-
-    if (!userData) {
-      throw new Error("Invalid user data");
-    }
-
-    /**
-     * Normalize the role to match frontend roles
-     * (admin | manager | staff)
-     */
-    const normalizedRole =
-      userData.role?.toLowerCase();
-
-    /**
-     * Store user inside AuthProvider state
-     */
-    setUser({
-      id: userData.id,
-      name: userData.name,
-      role: normalizedRole,
-    });
-
-  } catch (err) {
-
-    /**
-     * If request fails:
-     * - clear user
-     * - remove token
-     */
-    setUser(null);
-
-    localStorage.removeItem(TOKEN_KEY);
-
-  } finally {
-
-    /**
-     * Stop loading state
-     */
-    setLoading(false);
-
-  }
-}
-
- /**
    * Decode JWT token payload
    * JWT format = header.payload.signature
    * We decode the payload to extract user information
@@ -128,11 +49,27 @@ async function fetchUser(token: string) {
   function decodeToken(token: string): User | null {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
+      // Support both camelCase and PascalCase from backend (e.g. RoleName, UserName)
+      const rawName =
+        payload.username ?? payload.userName ?? payload.Username ?? "";
+      const rawRole = (
+        payload.roleName ??
+        payload.role ??
+        payload.RoleName ??
+        "staff"
+      )
+        .toString()
+        .toLowerCase();
+      // Map backend role names to frontend roles (align with users.mapper)
+      let role: UserRole = "staff";
+      if (rawRole === "superadmin" || rawRole === "admin") role = "admin";
+      else if (rawRole === "manager") role = "manager";
+      else if (rawRole === "staff") role = "staff";
 
       return {
-        id: payload.userId,
-        name: payload.username,
-        role: payload.roleName,
+        id: payload.userId ?? payload.sub ?? payload.UserId ?? "",
+        name: String(rawName).trim() || "User",
+        role,
       };
     } catch (err) {
       console.error("Invalid JWT token", err);
@@ -164,12 +101,12 @@ async function fetchUser(token: string) {
   }
 
   /**
-   * Logout function
-   * Clears token and user session
+   * Logout: clear all auth state (token + cookie) and redirect to login
    */
   function logout() {
-    localStorage.removeItem(TOKEN_KEY);
+    clearSession();
     setUser(null);
+    router.push("/login");
   }
 
   /**
@@ -201,7 +138,15 @@ async function fetchUser(token: string) {
    * Provide auth values to the whole app
    */
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        role: user?.role,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

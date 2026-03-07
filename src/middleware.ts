@@ -14,8 +14,11 @@ export function middleware(request: NextRequest) {
     "/ai-insights",
     "/reports",
     "/inventory",
-    "/users",
-    "/my-task",
+    "/people",
+    "/departments",
+    "/my-tasks",
+    "/activity",
+    "/orders",
   ];
 
   const isProtected = protectedRoutes.some((route) =>

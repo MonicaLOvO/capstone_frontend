@@ -1,5 +1,6 @@
 import type { ApiResponse } from "./types";
-import { clearToken, getToken } from "@/auth/token";
+import { getToken } from "@/auth/token";
+import { clearSession } from "@/auth/session";
 
 //all requests automatically go to backend server ....
 const BASE_URL =
@@ -41,14 +42,12 @@ async function request<T>(
     ...options,
   });
   
-  //handling expired session .. backend tells if token invalid, frontend logs user out..
+  // Session expired or invalid: clear all auth state and send to login
   if (res.status === 401) {
-    clearToken();
-    
-    // login page not ready yet → safe fallback
-    window.location.href = "/";
-    //   window.location.href = "/login";
-
+    clearSession();
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
     throw new Error("Session expired");
   }
 

@@ -101,16 +101,15 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const { has } = usePermissions(userRole);
 
-  /**
-   * Filter nav items based on permissions
-   */
-  // const visibleItems = navItems.filter((item) => has(item.permission));
-  ////////////// For demo purposes, show all items regardless of permissions
-  const visibleItems = navItems;
+  /** Staff: no People/Departments. Manager: People only. Admin: People + Departments. */
+  const visibleItems = navItems.filter((item) => {
+    if (item.href === "/departments") return userRole === "admin";
+    return has(item.permission);
+  });
   /**
    * Logout Handler
    */
@@ -261,9 +260,9 @@ export default function Sidebar({
 
           {!collapsed && (
             <Box>
-              <Typography level="body-sm">Super Admin</Typography>
+              <Typography level="body-sm">{user?.name ?? "…"}</Typography>
               <Typography level="body-xs" color="neutral">
-                {userRole}
+                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""}
               </Typography>
             </Box>
           )}

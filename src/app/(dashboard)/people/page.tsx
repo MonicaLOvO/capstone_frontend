@@ -24,7 +24,8 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export default function PeoplePage() {
   const { role } = useAuth();
-  const { has } = usePermissions(role);
+  const effectiveRole = role ?? "staff";
+  const { has } = usePermissions(effectiveRole);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,11 +44,12 @@ export default function PeoplePage() {
   >([]);
 
   
+  /** Only admin and manager can view People page; staff redirect to dashboard */
   useEffect(() => {
-    if (role === "staff") {
+    if (role !== undefined && !has("people.view")) {
       router.replace("/dashboard");
     }
-  }, [role, router]);
+  }, [role, has, router]);
   
   const [loading, setLoading] = useState(true);
   /**
@@ -238,10 +240,11 @@ export default function PeoplePage() {
 
   const canCreatePerson = has("users.create") || has("staff.create");
 
+  /** Manager: only staff in table and can only add/edit/delete/disable staff. Admin: all users. */
   const visiblePeople =
-    role === "manager"
+    effectiveRole === "manager"
       ? people.filter((p) => p.role === "staff")
-      : role === "admin"
+      : effectiveRole === "admin"
         ? people
         : [];
 
@@ -300,7 +303,7 @@ export default function PeoplePage() {
       <PeopleFilters
         value={filters}
         onChange={setFilters}
-        currentUserRole={role}
+        currentUserRole={effectiveRole}
         departments={departments}
       />
 
@@ -348,7 +351,7 @@ export default function PeoplePage() {
         person={editingPerson}
         departments={selectableDepartments}
         availableRoles={availableRoles}
-        currentUserRole={role}
+        currentUserRole={effectiveRole}
         submitError={submitError}
         onClose={() => {
           setDrawerOpen(false);

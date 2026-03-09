@@ -8,6 +8,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ReactNode } from "react";
 import { Permission } from "@/types/permissions";
+import ApartmentIcon  from "@mui/icons-material/Apartment";
 
 export interface NavItem {
   label: string;
@@ -15,6 +16,8 @@ export interface NavItem {
   permission: Permission;
   icon: ReactNode;
   section?: string;
+  /** When true, hide from sidebar (e.g. not ready for capstone); keep route and code for later. */
+  hidden?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -22,7 +25,7 @@ export const navItems: NavItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
-    permission: "inventory.view", // basic access permission
+    permission: "dashboard.view", // basic access permission
     icon: <DashboardIcon />,
     section: "Main",
   },
@@ -48,6 +51,7 @@ export const navItems: NavItem[] = [
     permission: "tasks.view.all", //admin + manager only
     icon: <MonitorIcon />,
     section: "Management",
+    hidden: true, // Not in scope for capstone; re-enable when feature is ready
   },
   {
     label: "Reports",
@@ -62,15 +66,29 @@ export const navItems: NavItem[] = [
     permission: "ai.view",
     icon: <InsightsIcon />,
     section: "Management",
+    hidden: true, // Not in scope for capstone; re-enable when feature is ready
   },
   {
-    label: "Staff Management",
-    href: "/staff-management",
-    permission: "staff.view",
+    label: "People Management",      //same route, different permission visibility....
+    href: "/people",
+    permission: "people.view", // managers
     icon: <PeopleIcon />,
     section: "Management",
   },
-
+  {
+    label: "Departments",      
+    href: "/departments",
+    permission: "people.view", 
+    icon: <ApartmentIcon />,
+    section: "Management",
+  },
+  // {
+  //   label: "People Management",
+  //   href: "/people",
+  //   permission: "users.view", // admin
+  //   icon: <PeopleIcon />,
+  //   section: "Admin",
+  // },
   // ===== TASKS =====
   {
     label: "My Tasks",
@@ -78,14 +96,6 @@ export const navItems: NavItem[] = [
     permission: "tasks.view.own", //staff + manager
     icon: <AssignmentIcon />,
     section: "Tasks",
-  },
-
-  // ===== ADMIN =====
-  {
-    label: "User Management",
-    href: "/user-management",
-    permission: "users.view",
-    icon: <PeopleIcon />,
-    section: "Admin",
+    hidden: true, // Not in scope for capstone; re-enable when feature is ready
   },
 ];

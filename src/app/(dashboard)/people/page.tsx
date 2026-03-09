@@ -44,13 +44,13 @@ export default function PeoplePage() {
   >([]);
 
   
-  /** Only admin and manager can view People page; staff redirect to dashboard */
+  /** Only admin and manager can view People page; staff redirect to dashboard (URL protection) */
   useEffect(() => {
     if (role !== undefined && !has("people.view")) {
       router.replace("/dashboard");
     }
   }, [role, has, router]);
-  
+
   const [loading, setLoading] = useState(true);
   /**
    * TEMP MOCK DATA
@@ -258,6 +258,11 @@ export default function PeoplePage() {
   function getDepartmentId(name?: string) {
     if (!name) return undefined;
     return departments.find((d) => d.name === name)?.id;
+  }
+
+  /** Do not render content when user lacks permission (redirect in progress) */
+  if (role !== undefined && !has("people.view")) {
+    return null;
   }
 
   return (

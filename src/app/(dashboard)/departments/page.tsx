@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Box,
   Typography,
@@ -24,8 +25,12 @@ import {
 import { Dropdown, Menu, MenuButton, MenuItem, IconButton } from "@mui/joy";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { Chip } from "@mui/joy";
+import { useAuth } from "@/auth/AuthProvider";
 
 export default function DepartmentsPage() {
+  const router = useRouter();
+  const { role } = useAuth();
+
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -34,6 +39,13 @@ export default function DepartmentsPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState<ApiDepartment | null>(null);
+
+  /** Only admin can access Departments; manager/staff redirected to dashboard (URL protection) */
+  useEffect(() => {
+    if (role !== undefined && role !== "admin") {
+      router.replace("/dashboard");
+    }
+  }, [role, router]);
 
   async function loadDepartments() {
     try {
@@ -47,8 +59,13 @@ export default function DepartmentsPage() {
   }
 
   useEffect(() => {
-    loadDepartments();
-  }, []);
+    if (role === "admin") loadDepartments();
+  }, [role]);
+
+  /** Do not render page content for non-admin (redirect in progress) */
+  if (role !== undefined && role !== "admin") {
+    return null;
+  }
 
   return (
     <Box sx={{ width: "100%" }}>

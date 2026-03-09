@@ -28,6 +28,7 @@ export function PersonForm({
     firstName: string;
     lastName: string;
     email: string;
+    username: string;
     role: Person["role"];
     department: string;
     status: Person["status"];
@@ -40,6 +41,7 @@ export function PersonForm({
       firstName: person?.firstName ?? "",
       lastName: person?.lastName ?? "",
       email: person?.email ?? "",
+      username: person?.username ?? "",
       role: person?.role ?? "staff",
       department,
       status: person?.status ?? "active",
@@ -85,6 +87,7 @@ export function PersonForm({
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email.trim().toLowerCase(),
+          username: form.username.trim() || undefined,
           role: form.role,
           department: form.department,
           status: form.status,
@@ -133,6 +136,18 @@ export function PersonForm({
       {errors.email && (
         <Typography level="body-xs" color="danger">
           {errors.email}
+        </Typography>
+      )}
+
+      <Input
+        placeholder="Username (optional; display in sidebar when logged in; blank = use email)"
+        value={form.username}
+        error={!!errors.username}
+        onChange={(e) => setForm({ ...form, username: e.target.value })}
+      />
+      {errors.username && (
+        <Typography level="body-xs" color="danger">
+          {errors.username}
         </Typography>
       )}
 

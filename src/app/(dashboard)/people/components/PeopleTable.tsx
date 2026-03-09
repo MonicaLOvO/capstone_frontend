@@ -14,6 +14,8 @@ export type Person = {
   firstName: string;
   lastName: string;
   email: string;
+  /** Display name for sidebar when logged in; may differ from email. Not shown in table. */
+  username?: string;
   role: "admin" | "manager" | "staff";
   department: string;
   status: "active" | "inactive";

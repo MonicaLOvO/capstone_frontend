@@ -132,11 +132,11 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleLogin}>
 
-          <label style={{ color: theme.text }}>Username</label>
+          <label style={{ color: theme.text }}>Username or email</label>
 
           <input
             type="text"
-            placeholder="Enter username"
+            placeholder="Enter username or email"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             style={{

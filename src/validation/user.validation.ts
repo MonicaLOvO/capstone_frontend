@@ -2,12 +2,14 @@ export type UserValidationErrors = {
   firstName?: string;
   lastName?: string;
   email?: string;
+  username?: string;
 };
 
 export type UserFormInput = {
   firstName: string;
   lastName: string;
   email: string;
+  username?: string;
   role: string;
   department?: string;
   status: string;
@@ -41,6 +43,15 @@ export function validateUser(
     errors.email = "Email required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
     errors.email = "Invalid email";
+
+  // USERNAME (optional; when provided: 2–50 chars, letters/numbers/space/hyphen/underscore/period/apostrophe)
+  const username = typeof data.username === "string" ? data.username.trim() : "";
+  if (username.length > 0) {
+    if (username.length < 2 || username.length > 50)
+      errors.username = "Username must be 2–50 characters";
+    else if (!/^[a-zA-Z0-9\s._'-]+$/.test(username))
+      errors.username = "Only letters, numbers, spaces, and . _ - ' allowed";
+  }
 
   return errors;
 }

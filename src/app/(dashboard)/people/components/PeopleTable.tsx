@@ -14,7 +14,7 @@ export type Person = {
   firstName: string;
   lastName: string;
   email: string;
-  /** Display name for sidebar when logged in; may differ from email. Not shown in table. */
+  /** Display name for sidebar when logged in; may differ from email.  */
   username?: string;
   role: "admin" | "manager" | "staff";
   department: string;
@@ -40,7 +40,8 @@ export function PeopleTable({
   onToggleStatus,
 }: Props) {
   const { role } = useAuth();
-  const { has } = usePermissions(role);
+  const effectiveRole = role ?? "staff";
+  const { has } = usePermissions(effectiveRole);
 
   return (
     <Sheet
@@ -110,8 +111,8 @@ export function PeopleTable({
 
                 const canEditTarget =
                   !isSelf &&
-                  ((role === "admin" && p.role !== "admin") ||
-                    (role === "manager" && p.role === "staff"));
+                  ((effectiveRole === "admin" && p.role !== "admin") ||
+                    (effectiveRole === "manager" && p.role === "staff"));
 
                 return (
                   <tr key={p.id}>

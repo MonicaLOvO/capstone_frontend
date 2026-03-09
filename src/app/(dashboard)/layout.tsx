@@ -22,24 +22,25 @@ export default function DashboardLayout({
   const { user } = useAuth();
 
   /**
-   * Extract role safely
+   * Extract role safely; fallback to "staff" so Sidebar always receives a valid UserRole (e.g. during auth load).
    */
-  const role = user?.role;
+  const userRole = user?.role ?? "staff";
   return (
     <AuthGuard>
 
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar (fixed so it doesn't scroll; wrapper reserves space) */}
       <Box
         sx={{
           display: { xs: "none", md: "block" },
           width: collapsed ? 80 : 260,
-          transition: "width 0.2s ease",
+          minHeight: "100vh",
           flexShrink: 0,
+          transition: "width 0.2s ease",
         }}
       >
         <Sidebar
-          userRole={role}
+          userRole={userRole}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed(!collapsed)}
         />
@@ -60,7 +61,7 @@ export default function DashboardLayout({
         }}
       >
         <Sidebar
-          userRole={role}
+          userRole={userRole}
           collapsed={false}
           onToggleCollapse={() => {}}
           onNavigate={() => setMobileOpen(false)}

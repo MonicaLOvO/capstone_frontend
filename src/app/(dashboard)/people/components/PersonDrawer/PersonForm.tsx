@@ -138,9 +138,9 @@ export function PersonForm({
           {errors.email}
         </Typography>
       )}
-
+      {/* (display in sidebar when logged in; blank = use email) */}
       <Input
-        placeholder="Username (optional; display in sidebar when logged in; blank = use email)"
+        placeholder="Username (optional)"
         value={form.username}
         error={!!errors.username}
         onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -158,6 +158,12 @@ export function PersonForm({
           setForm({ ...form, role: v! });
           blurActiveElement();
         }}
+        slotProps={{
+          listbox: {
+            placement: "bottom-start",
+            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+          },
+        }}
       >
         {selectableRoleOptions.map((r) => (
           <Option key={r.role} value={r.role}>
@@ -173,6 +179,12 @@ export function PersonForm({
         onChange={(_, v) => {
           setForm({ ...form, department: v ?? "" });
           blurActiveElement();
+        }}
+        slotProps={{
+          listbox: {
+            placement: "bottom-start",
+            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+          },
         }}
       >
         <Option value="" disabled={hasExistingDepartment}>
@@ -192,6 +204,12 @@ export function PersonForm({
         onChange={(_, v) => {
           setForm({ ...form, status: v! });
           blurActiveElement();
+        }}
+        slotProps={{
+          listbox: {
+            placement: "bottom-start",
+            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+          },
         }}
       >
         <Option value="active">Active</Option>

@@ -105,11 +105,17 @@ export default function Sidebar({
 
   const { has } = usePermissions(userRole);
 
-  /** Staff: no People/Departments. Manager: People only. Admin: People + Departments. */
+  /** Staff: no People/Departments. Manager: People only. Admin: People + Departments. Hidden items (e.g. not ready for capstone) excluded. */
   const visibleItems = navItems.filter((item) => {
+    if (item.hidden) return false;
     if (item.href === "/departments") return userRole === "admin";
     return has(item.permission);
   });
+
+  /** Set to true to show Settings in sidebar (e.g. after capstone when feature is ready). */
+  const showSettingsInNav = false;
+  /** Set to true when sidebar search (nav filter / global search) is implemented. */
+  const showSidebarSearch = false;
   /**
    * Logout Handler
    */
@@ -121,7 +127,11 @@ export default function Sidebar({
 
   return (
     <Sheet
+      component="aside"
       sx={{
+        position: "fixed",
+        top: 0,
+        left: 0,
         width: collapsed ? 80 : 260,
         height: "100vh",
         transition: "width 0.2s ease",
@@ -131,6 +141,7 @@ export default function Sidebar({
         borderColor: "divider",
         bgcolor: "background.surface",
         p: 2,
+        zIndex: 10,
       }}
     >
       {/* -------------------------------- */}
@@ -187,9 +198,9 @@ export default function Sidebar({
       </Box>
 
       {/* -------------------------------- */}
-      {/* Search (only when expanded)      */}
+      {/* Search (hidden until implemented; set showSidebarSearch = true when ready) */}
       {/* -------------------------------- */}
-      {!collapsed && (
+      {showSidebarSearch && !collapsed && (
         <Input
           size="sm"
           startDecorator={<SearchIcon />}
@@ -219,17 +230,19 @@ export default function Sidebar({
       <Box sx={{ flexGrow: 1 }} />
 
       {/* -------------------------------- */}
-      {/* Settings                         */}
+      {/* Settings (hidden for capstone; set showSettingsInNav = true to show) */}
       {/* -------------------------------- */}
-      <List sx={{ mt: "auto" }}>
+      {showSettingsInNav && (
+        <List sx={{ mt: "auto" }}>
           <SidebarItem
             icon={<SettingsIcon />}
             label="Settings"
             href="/settings"
             collapsed={collapsed}
             selected={pathname === "/settings"}
-     />
-      </List>
+          />
+        </List>
+      )}
 
       <Divider sx={{ my: 2 }} />
 

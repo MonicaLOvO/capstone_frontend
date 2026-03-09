@@ -140,10 +140,19 @@ export function PeopleTable({
                       <Chip
                         size="sm"
                         variant="soft"
+                        color={
+                          p.role === "admin"
+                            ? "primary"
+                            : p.role === "manager"
+                            ? "warning"
+                            : "neutral"
+                        }
                         sx={{
-                          minWidth: 58,
+                          minWidth: 70,
+                          px: 0.5,
                           display: "inline-flex",
                           justifyContent: "center",
+                          textTransform: "capitalize",
                           "& .MuiChip-label": { textAlign: "center" },
                         }}
                       >

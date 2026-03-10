@@ -40,7 +40,10 @@ export const config = {
     "/ai-insights/:path*",
     "/reports/:path*",
     "/inventory/:path*",
-    "/users/:path*",
-    "/my-task/:path*",
+    "/people/:path*",
+    "/departments/:path*",
+    "/my-tasks/:path*",
+    "/activity/:path*",
+    "/orders/:path*",
   ],
 };

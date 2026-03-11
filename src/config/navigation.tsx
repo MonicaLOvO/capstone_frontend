@@ -16,6 +16,8 @@ export interface NavItem {
   permission: Permission;
   icon: ReactNode;
   section?: string;
+  /** When true, hide from sidebar (e.g. not ready for capstone); keep route and code for later. */
+  hidden?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -49,6 +51,7 @@ export const navItems: NavItem[] = [
     permission: "tasks.view.all", //admin + manager only
     icon: <MonitorIcon />,
     section: "Management",
+    hidden: true, // Not in scope for capstone; re-enable when feature is ready
   },
   {
     label: "Reports",
@@ -63,6 +66,7 @@ export const navItems: NavItem[] = [
     permission: "ai.view",
     icon: <InsightsIcon />,
     section: "Management",
+    hidden: true, // Not in scope for capstone; re-enable when feature is ready
   },
   {
     label: "People Management",      //same route, different permission visibility....
@@ -92,5 +96,6 @@ export const navItems: NavItem[] = [
     permission: "tasks.view.own", //staff + manager
     icon: <AssignmentIcon />,
     section: "Tasks",
+    hidden: true, // Not in scope for capstone; re-enable when feature is ready
   },
 ];

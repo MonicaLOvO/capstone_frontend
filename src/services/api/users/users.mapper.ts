@@ -15,6 +15,7 @@ export function mapUser(dto: ApiUser): Person {
     firstName: dto.FirstName ?? "",
     lastName: dto.LastName ?? "",
     email: dto.Email,
+    username: dto.Username ?? undefined,
     role,
 
     // department: dto.Department?.DepartmentName ?? "",

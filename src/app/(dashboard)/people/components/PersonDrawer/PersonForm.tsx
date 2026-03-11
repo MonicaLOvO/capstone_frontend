@@ -28,6 +28,7 @@ export function PersonForm({
     firstName: string;
     lastName: string;
     email: string;
+    username: string;
     role: Person["role"];
     department: string;
     status: Person["status"];
@@ -40,6 +41,7 @@ export function PersonForm({
       firstName: person?.firstName ?? "",
       lastName: person?.lastName ?? "",
       email: person?.email ?? "",
+      username: person?.username ?? "",
       role: person?.role ?? "staff",
       department,
       status: person?.status ?? "active",
@@ -85,6 +87,7 @@ export function PersonForm({
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email.trim().toLowerCase(),
+          username: form.username.trim() || undefined,
           role: form.role,
           department: form.department,
           status: form.status,
@@ -135,6 +138,18 @@ export function PersonForm({
           {errors.email}
         </Typography>
       )}
+      {/* (display in sidebar when logged in; blank = use email) */}
+      <Input
+        placeholder="Username (optional)"
+        value={form.username}
+        error={!!errors.username}
+        onChange={(e) => setForm({ ...form, username: e.target.value })}
+      />
+      {errors.username && (
+        <Typography level="body-xs" color="danger">
+          {errors.username}
+        </Typography>
+      )}
 
       <Select
         value={selectableRoleOptions.some((r) => r.role === form.role) ? form.role : (selectableRoleOptions[0]?.role ?? "staff")}
@@ -142,6 +157,12 @@ export function PersonForm({
         onChange={(_, v) => {
           setForm({ ...form, role: v! });
           blurActiveElement();
+        }}
+        slotProps={{
+          listbox: {
+            placement: "bottom-start",
+            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+          },
         }}
       >
         {selectableRoleOptions.map((r) => (
@@ -158,6 +179,12 @@ export function PersonForm({
         onChange={(_, v) => {
           setForm({ ...form, department: v ?? "" });
           blurActiveElement();
+        }}
+        slotProps={{
+          listbox: {
+            placement: "bottom-start",
+            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+          },
         }}
       >
         <Option value="" disabled={hasExistingDepartment}>
@@ -177,6 +204,12 @@ export function PersonForm({
         onChange={(_, v) => {
           setForm({ ...form, status: v! });
           blurActiveElement();
+        }}
+        slotProps={{
+          listbox: {
+            placement: "bottom-start",
+            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+          },
         }}
       >
         <Option value="active">Active</Option>

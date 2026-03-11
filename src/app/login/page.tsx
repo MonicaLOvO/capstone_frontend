@@ -56,7 +56,7 @@ export default function LoginPage() {
       /**
        * Save user in AuthContext
        */
-      await login(token);
+      await login(token, data?.Data?.user);
 
       router.push("/dashboard");
 

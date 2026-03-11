@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserRole } from "@/types/roles";
 import { clearSession } from "@/auth/session";
+import { usersApi } from "@/services/api/users/users.api";
 
 /**
  * Frontend User model
@@ -12,6 +13,9 @@ import { clearSession } from "@/auth/session";
 type User = {
   id: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  email: string;
   role: UserRole;
 };
 /**
@@ -21,8 +25,17 @@ type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  login: (token: string) => Promise<void>;
+  login: (
+    token: string,
+    userDetails?: {
+      Id?: string;
+      FirstName?: string;
+      LastName?: string;
+      Email?: string;
+    },
+  ) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
   /** Current user role (convenience so components can use const { role } = useAuth()) */
   role: UserRole | undefined;
 };
@@ -40,17 +53,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const TOKEN_KEY = "wms_token";
+  const USER_KEY = "wms_user";
 
   /**
    * Decode JWT token payload
    * JWT format = header.payload.signature
    * We decode the payload to extract user information
    */
-  function decodeToken(token: string): User | null {
+  function decodeToken(
+    token: string,
+    userDetails?: {
+      Id?: string;
+      FirstName?: string;
+      LastName?: string;
+      Email?: string;
+    },
+  ): User | null {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
-      // Support both camelCase and PascalCase from backend (e.g. RoleName, UserName)
-      const rawName =
+      const rawFirstName =
+        userDetails?.FirstName ??
+        payload.firstName ??
+        payload.FirstName ??
+        "";
+      const rawLastName =
+        userDetails?.LastName ??
+        payload.lastName ??
+        payload.LastName ??
+        "";
+      const fallbackName =
         payload.username ?? payload.userName ?? payload.Username ?? "";
       const rawRole = (
         payload.roleName ??
@@ -66,9 +97,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       else if (rawRole === "manager") role = "manager";
       else if (rawRole === "staff") role = "staff";
 
+      const firstName = String(rawFirstName).trim();
+      const lastName = String(rawLastName).trim();
+      const name = [firstName, lastName].filter(Boolean).join(" ") || String(fallbackName).trim() || "User";
+
       return {
-        id: payload.userId ?? payload.sub ?? payload.UserId ?? "",
-        name: String(rawName).trim() || "User",
+        id: userDetails?.Id ?? payload.userId ?? payload.sub ?? payload.UserId ?? "",
+        name,
+        firstName,
+        lastName,
+        email: String(
+          userDetails?.Email ??
+          payload.email ??
+            payload.Email ??
+            payload.mail ??
+            payload.Mail ??
+            payload.upn ??
+            payload.Upn ??
+            "",
+        ).trim(),
         role,
       };
     } catch (err) {
@@ -81,13 +128,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Login function
    * Called after backend returns JWT
    */
-  async function login(token: string) {
+  async function login(
+    token: string,
+    userDetails?: {
+      Id?: string;
+      FirstName?: string;
+      LastName?: string;
+      Email?: string;
+    },
+  ) {
 
     // Save token in localStorage
     localStorage.setItem(TOKEN_KEY, token);
 
     // Decode JWT
-    const decodedUser = decodeToken(token);
+    const decodedUser = decodeToken(token, userDetails);
 
     if (!decodedUser) {
       throw new Error("Invalid token received");
@@ -95,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Store user in context
     setUser(decodedUser);
+    localStorage.setItem(USER_KEY, JSON.stringify(decodedUser));
 
     // Authentication finished
     setLoading(false);
@@ -105,8 +161,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   function logout() {
     clearSession();
+    localStorage.removeItem(USER_KEY);
     setUser(null);
     router.push("/login");
+  }
+
+  function updateUser(updates: Partial<User>) {
+    setUser((current) => {
+      if (!current) return current;
+      const next = {
+        ...current,
+        ...updates,
+      };
+      localStorage.setItem(USER_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function mergeCurrentUserDetails(
+    currentUser: User,
+    apiUser: {
+      Id?: string;
+      FirstName?: string;
+      LastName?: string;
+      Email?: string;
+      Role?: { RoleName?: string };
+    },
+  ): User {
+    const firstName = apiUser.FirstName?.trim() ?? currentUser.firstName;
+    const lastName = apiUser.LastName?.trim() ?? currentUser.lastName;
+    const roleName = apiUser.Role?.RoleName?.toLowerCase();
+
+    let role = currentUser.role;
+    if (roleName === "superadmin" || roleName === "admin") role = "admin";
+    else if (roleName === "manager") role = "manager";
+    else if (roleName === "staff") role = "staff";
+
+    return {
+      ...currentUser,
+      id: apiUser.Id ?? currentUser.id,
+      firstName,
+      lastName,
+      email: apiUser.Email?.trim() ?? currentUser.email,
+      role,
+      name: [firstName, lastName].filter(Boolean).join(" ") || currentUser.name,
+    };
   }
 
   /**
@@ -116,18 +215,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
 
     const token = localStorage.getItem(TOKEN_KEY);
+    const storedUser = localStorage.getItem(USER_KEY);
 
     if (!token) {
       setLoading(false);
       return;
     }
 
-    const decodedUser = decodeToken(token);
+    const parsedStoredUser = storedUser ? JSON.parse(storedUser) : undefined;
+    const decodedUser = decodeToken(token, parsedStoredUser);
 
     if (decodedUser) {
       setUser(decodedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(decodedUser));
+
+      if (!decodedUser.firstName && !decodedUser.lastName) {
+        usersApi
+          .getCurrent()
+          .then((apiUser) => {
+            setUser((current) => {
+              if (!current) return current;
+              const next = mergeCurrentUserDetails(current, apiUser);
+              localStorage.setItem(USER_KEY, JSON.stringify(next));
+              return next;
+            });
+          })
+          .catch(() => {
+            // Keep the decoded user if the profile lookup fails.
+          });
+      }
     } else {
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
     }
 
     setLoading(false);
@@ -144,6 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         login,
         logout,
+        updateUser,
         role: user?.role,
       }}
     >

@@ -4,7 +4,6 @@ import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option,
 import SearchIcon from '@mui/icons-material/Search';
 import React, { useCallback, useEffect, useState } from 'react';
 import OrderTable from './components/OrderTable';
-import OrderList from './components/OrderList';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import { OrderDialog } from './components/OrderDialog';

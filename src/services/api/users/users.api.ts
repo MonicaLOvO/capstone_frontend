@@ -9,6 +9,17 @@ import { http } from "../http";
 const BASE_URL = "/api/user";
 
 export const usersApi = {
+  async getCurrent(): Promise<ApiUser> {
+    return http.data<ApiUser>(`${BASE_URL}/current`);
+  },
+
+  async updateCurrent(payload: { firstName?: string; lastName?: string }) {
+    return http.data<ApiUser>(`${BASE_URL}/current`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
   async list(query: UsersListQuery): Promise<UsersListResponse> {
     const params = new URLSearchParams({
       Page: String(query.Page),

@@ -89,10 +89,11 @@ export default function OrdersPage() {
   );
   
   return (
-    <React.Fragment>
+    <React.Fragment> 
       <Box
       sx={{
         flex: 1,          
+        minHeight: 0,     
         display: 'flex',
         flexDirection: 'column',
       }}

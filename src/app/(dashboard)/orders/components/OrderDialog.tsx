@@ -9,6 +9,7 @@ import {
   FormControl,
   FormHelperText,
   FormLabel,
+  IconButton,
   Input,
   Modal,
   ModalDialog,
@@ -21,6 +22,8 @@ import {
 import { OrderStatusEnum, type UpsertOrderDTO } from "@/services/api/orders/orders.types";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { searchInventory } from "@/services/api/inventory/inventory.search";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import { InventoryItemStatusEnum } from "@/services/api/inventory/inventory.types";
 import type { InventoryItem } from "@/services/api/inventory/inventory.mapper";
 
@@ -37,6 +40,7 @@ type AddedOrderItem = {
   sku: string;
   quantityAvailable: number;
   quantity: number;
+  unitPrice: number;
 };
 
 function toDateInput(value?: string | Date) {
@@ -63,6 +67,10 @@ function isNonEmpty(s: string) {
   return s.trim().length > 0;
 }
 
+function formatMoney(value: number) {
+  return `$${value.toFixed(2)}`;
+}
+
 export function OrderDialog({
   open,
   onClose,
@@ -83,6 +91,9 @@ export function OrderDialog({
   const [addedItems, setAddedItems] = useState<AddedOrderItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [confirmAddOpen, setConfirmAddOpen] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const orderTotal = addedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   useEffect(() => {
     if (open) {
@@ -94,6 +105,8 @@ export function OrderDialog({
       setAddedItems([]);
       setErrors({});
       setApiError(null);
+      setConfirmAddOpen(false);
+      setConfirmCancelOpen(false);
     }
   }, [open]);
 
@@ -136,27 +149,62 @@ export function OrderDialog({
     setErrors((prev) => ({ ...prev, [key]: "" }));
   };
 
+  function changeAddedQuantity(inventoryItemId: string, delta: number) {
+    setAddedItems((prev) =>
+      prev.flatMap((item) => {
+        if (item.inventoryItemId !== inventoryItemId) return [item];
+
+        const nextQuantity = Math.min(
+          item.quantityAvailable,
+          Math.max(0, item.quantity + delta),
+        );
+
+        if (nextQuantity <= 0) return [];
+
+        return [{ ...item, quantity: nextQuantity }];
+      }),
+    );
+    setErrors((prev) => ({ ...prev, OrderItems: "" }));
+  }
+
   function canAddItem(item: InventoryItem) {
     return (
-      item.status === InventoryItemStatusEnum.InStock &&
-      item.quantity > 0 &&
-      !addedItems.some((x) => x.inventoryItemId === item.id)
+      (item.status === InventoryItemStatusEnum.InStock || item.status === InventoryItemStatusEnum.LowStock) &&
+      item.quantity > 0
     );
   }
 
   function addItem(item: InventoryItem) {
     if (!canAddItem(item)) return;
 
-    setAddedItems((prev) => [
-      ...prev,
-      {
-        inventoryItemId: item.id,
-        productName: item.productName || "Unnamed Item",
-        sku: item.sku || "-",
-        quantityAvailable: item.quantity,
-        quantity: 1,
-      },
-    ]);
+    setAddedItems((prev) => {
+      const existing = prev.find((x) => x.inventoryItemId === item.id);
+
+      if (existing) {
+        return prev.map((added) =>
+          added.inventoryItemId === item.id
+            ? {
+                ...added,
+                quantityAvailable: item.quantity,
+                unitPrice: item.unitPrice,
+                quantity: Math.min(item.quantity, added.quantity + 1),
+              }
+            : added,
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          inventoryItemId: item.id,
+          productName: item.productName || "Unnamed Item",
+          sku: item.sku || "-",
+          quantityAvailable: item.quantity,
+          quantity: 1,
+          unitPrice: item.unitPrice,
+        },
+      ];
+    });
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
@@ -192,13 +240,27 @@ export function OrderDialog({
 
     try {
       await onSubmit(payload);
+      setConfirmAddOpen(false);
       onClose();
     } catch (e: unknown) {
       setApiError(e instanceof Error ? e.message : "Something went wrong");
     }
   }
 
+  function requestSubmitConfirmation() {
+    const nextErrors = validate(values);
+    setErrors(nextErrors);
+    setApiError(null);
+    if (Object.keys(nextErrors).length > 0) return;
+    setConfirmAddOpen(true);
+  }
+
+  function requestCancelConfirmation() {
+    setConfirmCancelOpen(true);
+  }
+
   return (
+    <>
     <Modal open={open} onClose={onClose}>
       <ModalDialog
         size="lg"
@@ -293,9 +355,9 @@ export function OrderDialog({
                 ) : (
                   <Stack spacing={1}>
                     {inventoryResults.map((item) => {
-                      const inStock =
-                        item.status === InventoryItemStatusEnum.InStock && item.quantity > 0;
-                      const alreadyAdded = addedItems.some((x) => x.inventoryItemId === item.id);
+                      const inStock = canAddItem(item);
+                      const addedItem = addedItems.find((x) => x.inventoryItemId === item.id);
+                      const atMaxQuantity = (addedItem?.quantity ?? 0) >= item.quantity;
                       return (
                         <Stack
                           key={item.id}
@@ -310,7 +372,7 @@ export function OrderDialog({
                               {item.productName || "Unnamed Item"}
                             </Typography>
                             <Typography level="body-xs" sx={{ color: "text.tertiary" }}>
-                              SKU: {item.sku || "-"} | Qty: {item.quantity}
+                              SKU: {item.sku || "-"} | Qty: {item.quantity} | Price: {formatMoney(item.unitPrice)}
                             </Typography>
                             {!inStock ? (
                               <Typography level="body-xs" color="warning">
@@ -321,10 +383,10 @@ export function OrderDialog({
                           <Button
                             size="sm"
                             variant="outlined"
-                            disabled={!inStock || alreadyAdded}
+                            disabled={!inStock || atMaxQuantity}
                             onClick={() => addItem(item)}
                           >
-                            {alreadyAdded ? "Added" : "Add Item"}
+                            {addedItem ? `Add More (${addedItem.quantity})` : "Add Item"}
                           </Button>
                         </Stack>
                       );
@@ -357,41 +419,135 @@ export function OrderDialog({
                             {item.productName}
                           </Typography>
                           <Typography level="body-xs" sx={{ color: "text.tertiary" }}>
-                            SKU: {item.sku} | Quantity: {item.quantity} | In stock:{" "}
-                            {item.quantityAvailable}
+                            SKU: {item.sku} | In stock: {item.quantityAvailable} | Unit: {formatMoney(item.unitPrice)}
                           </Typography>
                         </Box>
-                        <Button
-                          size="sm"
-                          variant="outlined"
-                          color="danger"
-                          onClick={() => removeItem(item.inventoryItemId)}
-                        >
-                          Remove
-                        </Button>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <IconButton
+                            size="sm"
+                            variant="outlined"
+                            onClick={() => changeAddedQuantity(item.inventoryItemId, -1)}
+                          >
+                            <RemoveIcon />
+                          </IconButton>
+                          <Typography level="body-sm" sx={{ minWidth: 92, textAlign: "center" }}>
+                            {item.quantity} / {item.quantityAvailable}
+                          </Typography>
+                          <Typography level="body-sm" fontWeight={600} sx={{ minWidth: 88, textAlign: "center" }}>
+                            {formatMoney(item.quantity * item.unitPrice)}
+                          </Typography>
+                          <IconButton
+                            size="sm"
+                            variant="outlined"
+                            disabled={item.quantity >= item.quantityAvailable}
+                            onClick={() => changeAddedQuantity(item.inventoryItemId, 1)}
+                          >
+                            <AddIcon />
+                          </IconButton>
+                          <Button
+                            size="sm"
+                            variant="outlined"
+                            color="danger"
+                            onClick={() => removeItem(item.inventoryItemId)}
+                          >
+                            Remove
+                          </Button>
+                        </Stack>
                       </Stack>
                     ))}
                   </Stack>
                 </Sheet>
               )}
-              {errors.OrderItems ? (
-                <Typography level="body-sm" color="danger">
-                  {errors.OrderItems}
-                </Typography>
-              ) : null}
-            </Stack>
 
-            <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ pt: 1 }}>
-              <Button variant="outlined" color="neutral" onClick={onClose} disabled={submitting}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} loading={submitting}>
-                Add Order
-              </Button>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }} width={"100%"}>
+                {addedItems.length > 0 ? (
+                  <Typography level="title-md" sx={{ textAlign: "left", pt: 1 }}>
+                    Total: {formatMoney(orderTotal)}
+                  </Typography>
+                ) : <Typography level="title-md" sx={{ textAlign: "left", pt: 1 }}>Total: $0.00</Typography>}
+                {errors.OrderItems ? (
+                  <Typography level="body-sm" color="danger">
+                    {errors.OrderItems}
+                  </Typography>
+                ) : null}
+
+                <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ pt: 1 }} alignSelf="right">
+                  <Button
+                    variant="outlined"
+                    color="neutral"
+                    onClick={requestCancelConfirmation}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={requestSubmitConfirmation} loading={submitting}>
+                    Add Order
+                  </Button>
+
+                </Stack>
+              </Stack>
             </Stack>
           </Stack>
         </DialogContent>
       </ModalDialog>
+
     </Modal>
+      <Modal open={confirmAddOpen} onClose={() => setConfirmAddOpen(false)}>
+        <ModalDialog size="sm">
+          <DialogTitle>Confirm Order</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Typography level="body-sm">
+                Add this order with a total of {formatMoney(orderTotal)}?
+              </Typography>
+              <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                <Button
+                  variant="outlined"
+                  color="neutral"
+                  onClick={() => setConfirmAddOpen(false)}
+                  disabled={submitting}
+                >
+                  Back
+                </Button>
+                <Button onClick={handleSubmit} loading={submitting}>
+                  Confirm Add
+                </Button>
+              </Stack>
+            </Stack>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
+
+      <Modal open={confirmCancelOpen} onClose={() => setConfirmCancelOpen(false)}>
+        <ModalDialog size="sm">
+          <DialogTitle>Discard Order?</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Typography level="body-sm">
+                Canceling will discard the current order details and selected items.
+              </Typography>
+              <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                <Button
+                  variant="outlined"
+                  color="neutral"
+                  onClick={() => setConfirmCancelOpen(false)}
+                >
+                  Keep Editing
+                </Button>
+                <Button
+                  color="danger"
+                  onClick={() => {
+                    setConfirmCancelOpen(false);
+                    onClose();
+                  }}
+                >
+                  Confirm Cancel
+                </Button>
+              </Stack>
+            </Stack>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
+    </>
   );
 }

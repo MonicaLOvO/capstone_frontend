@@ -11,8 +11,16 @@ import { OrderDialog } from './components/OrderDialog';
 import { ordersApi } from '@/services/api/orders/orders.api';
 import type { UpsertOrderDTO } from '@/services/api/orders/orders.types';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { inventoryApi } from '@/services/api/inventory/inventory.api';
+import { InventoryItemStatusEnum } from '@/services/api/inventory/inventory.types';
 import router from 'next/router';
 import { useAuth } from '@/auth/AuthProvider';
+
+function getInventoryStatus(quantity: number): number {
+  if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
+  if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
+  return Number(InventoryItemStatusEnum.InStock);
+}
 
 export default function OrdersPage() {
   
@@ -34,6 +42,34 @@ export default function OrdersPage() {
     setSubmitting(true);
     try {
       await ordersApi.create(payload);
+
+      if (payload.OrderItems?.length) {
+        await Promise.all(
+          payload.OrderItems.map(async (orderItem) => {
+            const inventoryItemId = orderItem.InventoryItemId;
+            if (!inventoryItemId) return;
+
+            const currentItem = await inventoryApi.getById(inventoryItemId);
+            const orderedQuantity = Number(orderItem.Quantity ?? 0);
+            const nextQuantity = Math.max(0, currentItem.quantity - orderedQuantity);
+
+            await inventoryApi.update(inventoryItemId, {
+              Id: currentItem.id,
+              ProductName: currentItem.productName,
+              Description: currentItem.description || null,
+              Quantity: nextQuantity,
+              UnitPrice: currentItem.unitPrice,
+              QrCodeValue: currentItem.qrCodeValue || null,
+              ImageUrl: currentItem.imageUrl || null,
+              Category: currentItem.category || null,
+              Location: currentItem.location || null,
+              Sku: currentItem.sku || null,
+              Status: getInventoryStatus(nextQuantity),
+            });
+          }),
+        );
+      }
+
       setPage(1);
       setRefreshKey((k) => k + 1);
     } finally {
@@ -77,14 +113,7 @@ export default function OrdersPage() {
         </Select>
       </FormControl>
       
-      <FormControl size="sm">
 
-        {/* Customer Filter */}
-        <FormLabel>Customer</FormLabel>
-        <Select size="sm" placeholder="All">
-          <Option value="all">All</Option>
-        </Select>
-      </FormControl>
     </React.Fragment>
   );
   
@@ -194,7 +223,6 @@ export default function OrdersPage() {
             search={debouncedSearch}
             onTotalChange={handleTotalChange}
           />
-          <OrderList />
       </Box>
 
        <Box

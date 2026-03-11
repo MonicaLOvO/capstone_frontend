@@ -213,7 +213,7 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
                 sx={{ verticalAlign: 'text-bottom' }}
               />
             </th>
-            <th style={{ width: 120, padding: '12px 6px' }}>
+            <th style={{ width: 185, padding: '12px 6px' }}>
               <Link
                 underline="none"
                 color="primary"
@@ -234,8 +234,7 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
               </Link>
             </th>
             <th style={{ width: 140, padding: '12px 6px' }}>Date</th>
-            <th style={{ width: 140, padding: '12px 6px' }}>Status</th>
-            <th style={{ width: 260, padding: '12px 6px' }}>Customer</th>
+            <th style={{ width: 75, padding: '12px 6px' }}>Status</th>
             <th style={{ width: 140, padding: '12px 6px' }}></th>
           </tr>
         </thead>
@@ -273,6 +272,7 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
                     size="sm"
                     checked={selected.includes(row.id)}
                     color={selected.includes(row.id) ? 'primary' : undefined}
+                    // style={{ width: "100%" }}
                     onChange={(event) => {
                       setSelected((ids) =>
                         event.target.checked
@@ -311,14 +311,6 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
                   >
                     {row.status}
                   </Chip>
-                </td>
-                <td>
-                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                    <Box>
-                      <Typography level="body-xs">{row.customer.name}</Typography>
-                      <Typography level="body-xs">{row.customer.email}</Typography>
-                    </Box>
-                  </Box>
                 </td>
                 <td>
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>

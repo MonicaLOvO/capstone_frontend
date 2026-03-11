@@ -60,6 +60,12 @@ function isNonNegativeNumberString(s: string) {
   return Number.isFinite(n) && n >= 0;
 }
 
+function getStatusFromQuantity(quantity: number): number {
+  if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
+  if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
+  return Number(InventoryItemStatusEnum.InStock);
+}
+
 export function InventoryItemDialog({
   open,
   mode,
@@ -136,7 +142,7 @@ export function InventoryItemDialog({
       QrCodeValue: values.QrCodeValue.trim() || null,
       Quantity: Number(values.Quantity),
       UnitPrice: Number(values.UnitPrice),
-      Status: Number(values.Status), // ✅ convert to number for backend
+      Status: getStatusFromQuantity(Number(values.Quantity)),
     };
 
     try {

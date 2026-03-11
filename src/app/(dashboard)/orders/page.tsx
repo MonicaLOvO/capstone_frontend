@@ -200,7 +200,7 @@ export default function OrdersPage() {
             <FormLabel>Search for order</FormLabel>
             <Input
               size="sm"
-              placeholder="Search by order ID, type, customer, or email"
+              placeholder="Search by order ID or type"
               startDecorator={<SearchIcon />}
               value={search}
               onChange={(e) => {

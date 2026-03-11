@@ -261,7 +261,7 @@ export function OrderDialog({
 
   return (
     <>
-    <Modal open={open} onClose={onClose}>
+    <Modal open={open} onClose={requestCancelConfirmation}>
       <ModalDialog
         size="lg"
         sx={{

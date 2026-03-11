@@ -13,11 +13,7 @@ interface RowData {
   id: string;
   date: string;
   status: 'Pending' | 'Processing' | 'Unknown';
-  customer: {
-    name: string;
-    email: string;
-    initial: string;
-  };
+  type?: string;
 }
 
 type SortOrder = 'asc' | 'desc';
@@ -48,18 +44,13 @@ function toDisplayDate(value: string): string {
 }
 
 function mapOrderToRow(order: Order): RowData {
-  const customerName = order.customerName || 'Unknown Customer';
-  const customerEmail = order.customerEmail || '-';
+
 
   return {
     id: order.id,
     date: toDisplayDate(order.orderDate),
     status: toStatusLabel(order.orderStatus),
-    customer: {
-      name: customerName,
-      email: customerEmail,
-      initial: customerName.charAt(0).toUpperCase() || '?',
-    },
+    type: order.orderType || '-',
   };
 }
 
@@ -108,9 +99,7 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
 
           return (
             normalize(order.id).includes(term) ||
-            normalize(order.orderType).includes(term) ||
-            normalize(order.customerName).includes(term) ||
-            normalize(order.customerEmail).includes(term)
+            normalize(order.orderType).includes(term)
           );
         };
 
@@ -213,7 +202,7 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
                 sx={{ verticalAlign: 'text-bottom' }}
               />
             </th>
-            <th style={{ width: 185, padding: '12px 6px' }}>
+            <th style={{ width: "40%", padding: '12px 6px' }}>
               <Link
                 underline="none"
                 color="primary"
@@ -233,9 +222,10 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
                 Order ID
               </Link>
             </th>
-            <th style={{ width: 140, padding: '12px 6px' }}>Date</th>
-            <th style={{ width: 75, padding: '12px 6px' }}>Status</th>
-            <th style={{ width: 140, padding: '12px 6px' }}></th>
+            <th style={{ width: "10%", padding: '12px 6px' }}>Date</th>
+            <th style={{ width: "20%", padding: '12px 6px' }}>Type</th>
+            <th style={{ width: "15%", padding: '12px 6px' }}>Status</th>
+            <th style={{ width: "15%", padding: '12px 6px' }}></th>
           </tr>
         </thead>
 
@@ -289,6 +279,9 @@ export default function OrderTable({ page, pageSize, statusFilter, search, onTot
                 </td>
                 <td>
                   <Typography level="body-xs">{row.date}</Typography>
+                </td>
+                <td>
+                  <Typography level="body-xs">{row.type}</Typography>
                 </td>
                 <td>
                   <Chip

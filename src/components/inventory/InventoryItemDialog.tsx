@@ -16,22 +16,27 @@ import {
   Stack,
   Typography,
 } from "@mui/joy";
+
 import type { InventoryItemDTO } from "@/services/api/inventory/inventory.types";
 import { InventoryItemStatusEnum } from "@/services/api/inventory/inventory.types";
 
 type Mode = "create" | "edit";
 
-export type InventoryItemFormValues = {
+/**
+ * Form values as strings for easier input handling.
+ * We'll convert to numbers when we build the API payload.
+ */
+type InventoryItemFormValues = {
   ProductName: string;
   Sku: string;
   Category: string;
-  Quantity: string; // keep as string for input
+  Quantity: string;
   UnitPrice: string;
   Location: string;
   QrCodeValue: string;
   Description: string;
   ImageUrl: string;
-  Status: string; // enum string "0" | "2" | "5"
+  Status: string; // "0" | "2" | "5"
 };
 
 function toFormValues(dto?: Partial<InventoryItemDTO> | null): InventoryItemFormValues {
@@ -40,13 +45,15 @@ function toFormValues(dto?: Partial<InventoryItemDTO> | null): InventoryItemForm
     Sku: String(dto?.Sku ?? ""),
     Category: String(dto?.Category ?? ""),
     Quantity: dto?.Quantity === null || dto?.Quantity === undefined ? "" : String(dto?.Quantity),
-    UnitPrice:
-      dto?.UnitPrice === null || dto?.UnitPrice === undefined ? "" : String(dto?.UnitPrice),
+    UnitPrice: dto?.UnitPrice === null || dto?.UnitPrice === undefined ? "" : String(dto?.UnitPrice),
     Location: String(dto?.Location ?? ""),
     QrCodeValue: String(dto?.QrCodeValue ?? ""),
     Description: String(dto?.Description ?? ""),
     ImageUrl: String(dto?.ImageUrl ?? ""),
-    Status: dto?.Status === null || dto?.Status === undefined ? InventoryItemStatusEnum.OutStock : String(dto.Status),
+    Status:
+      dto?.Status === null || dto?.Status === undefined
+        ? InventoryItemStatusEnum.OutStock
+        : String(dto.Status),
   };
 }
 
@@ -55,7 +62,6 @@ function isNonEmpty(s: string) {
 }
 
 function isNonNegativeNumberString(s: string) {
-  if (!isNonEmpty(s)) return false;
   const n = Number(s);
   return Number.isFinite(n) && n >= 0;
 }
@@ -79,7 +85,7 @@ export function InventoryItemDialog({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // reset form when opening or initial changes
+  // Reset form each time the dialog opens or the initial item changes
   React.useEffect(() => {
     if (open) {
       setValues(toFormValues(initial));
@@ -90,6 +96,7 @@ export function InventoryItemDialog({
 
   const title = mode === "create" ? "Add New Product" : "Edit Product";
 
+  // Dropdown options for status
   const statusOptions = useMemo(
     () => [
       { value: InventoryItemStatusEnum.InStock, label: "In stock" },
@@ -99,10 +106,12 @@ export function InventoryItemDialog({
     []
   );
 
+  /**
+   * Validate form fields before sending to backend
+   */
   function validate(v: InventoryItemFormValues) {
     const next: Record<string, string> = {};
 
-    // Minimal required fields for your system
     if (!isNonEmpty(v.ProductName)) next.ProductName = "Product name is required";
     if (!isNonEmpty(v.Sku)) next.Sku = "SKU is required";
     if (!isNonEmpty(v.Category)) next.Category = "Category is required";
@@ -112,31 +121,48 @@ export function InventoryItemDialog({
     else if (!isNonNegativeNumberString(v.Quantity)) next.Quantity = "Quantity must be 0 or higher";
 
     if (!isNonEmpty(v.UnitPrice)) next.UnitPrice = "Unit price is required";
-    else if (!isNonNegativeNumberString(v.UnitPrice)) next.UnitPrice = "Unit price must be 0 or higher";
+    else if (!isNonNegativeNumberString(v.UnitPrice))
+      next.UnitPrice = "Unit price must be 0 or higher";
 
     if (!isNonEmpty(v.Status)) next.Status = "Status is required";
 
     return next;
   }
 
+  /**
+   * Submit handler:
+   * - Validates input
+   * - Builds the payload
+   * - Auto-sets QrCodeValue if empty (uses SKU first)
+   */
   async function handleSubmit() {
     const nextErrors = validate(values);
     setErrors(nextErrors);
     setApiError(null);
-
     if (Object.keys(nextErrors).length > 0) return;
 
+    const sku = values.Sku.trim();
+    const productName = values.ProductName.trim();
+
+    // ✅ AUTO QR VALUE: if user doesn't type a QR value, use SKU (best unique identifier)
+    const autoQrValue = sku || productName;
+
     const payload: Omit<InventoryItemDTO, "Id"> = {
-      ProductName: values.ProductName.trim(),
-      Sku: values.Sku.trim(),
+      ProductName: productName,
+      Sku: sku,
       Category: values.Category.trim(),
       Location: values.Location.trim(),
       Description: values.Description.trim() || null,
       ImageUrl: values.ImageUrl.trim() || null,
-      QrCodeValue: values.QrCodeValue.trim() || null,
+
+      // ✅ Use QRCodeValue if provided, otherwise auto-generate from SKU/ProductName
+      QrCodeValue: (values.QrCodeValue.trim() || autoQrValue) || null,
+
       Quantity: Number(values.Quantity),
       UnitPrice: Number(values.UnitPrice),
-      Status: Number(values.Status), // ✅ convert to number for backend
+
+      // backend expects number; enum is string → convert to number
+      Status: Number(values.Status),
     };
 
     try {
@@ -147,6 +173,7 @@ export function InventoryItemDialog({
     }
   }
 
+  // Helper to update a field and clear its error
   const setField = (key: keyof InventoryItemFormValues, val: string) => {
     setValues((prev) => ({ ...prev, [key]: val }));
     setErrors((prev) => ({ ...prev, [key]: "" }));
@@ -154,18 +181,12 @@ export function InventoryItemDialog({
 
   return (
     <Modal open={open} onClose={onClose}>
-      <ModalDialog
-        size="lg"
-        sx={{
-          width: { xs: "95vw", sm: 760 },
-          borderRadius: "lg",
-        }}
-      >
+      <ModalDialog size="lg" sx={{ width: { xs: "95vw", sm: 760 }, borderRadius: "lg" }}>
         <DialogTitle>
           <Stack spacing={0.5}>
             <Typography level="h3">{title}</Typography>
             <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
-              Enter the details of the product to save it to inventory.
+              Enter item details. QR value will auto-fill from SKU if left empty.
             </Typography>
           </Stack>
         </DialogTitle>
@@ -178,7 +199,7 @@ export function InventoryItemDialog({
               </Typography>
             ) : null}
 
-            {/* Two-column grid */}
+            {/* Row 1 */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <FormControl error={Boolean(errors.ProductName)} sx={{ flex: 1 }}>
                 <FormLabel>Product Name</FormLabel>
@@ -201,6 +222,7 @@ export function InventoryItemDialog({
               </FormControl>
             </Stack>
 
+            {/* Row 2 */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <FormControl error={Boolean(errors.Category)} sx={{ flex: 1 }}>
                 <FormLabel>Category</FormLabel>
@@ -217,11 +239,12 @@ export function InventoryItemDialog({
                 <Input
                   value={values.QrCodeValue}
                   onChange={(e) => setField("QrCodeValue", e.target.value)}
-                  placeholder="QR-INV-001..."
+                  placeholder="Leave empty to auto-generate from SKU"
                 />
               </FormControl>
             </Stack>
 
+            {/* Row 3 */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <FormControl error={Boolean(errors.Quantity)} sx={{ flex: 1 }}>
                 <FormLabel>Quantity</FormLabel>
@@ -246,6 +269,7 @@ export function InventoryItemDialog({
               </FormControl>
             </Stack>
 
+            {/* Row 4 */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <FormControl error={Boolean(errors.Location)} sx={{ flex: 1 }}>
                 <FormLabel>Location</FormLabel>
@@ -259,6 +283,8 @@ export function InventoryItemDialog({
 
               <FormControl error={Boolean(errors.Status)} sx={{ flex: 1 }}>
                 <FormLabel>Status</FormLabel>
+
+                {/* ✅ No Fragment around Option to avoid data-first-child errors */}
                 <Select
                   value={values.Status}
                   onChange={(_, v) => setField("Status", v ?? "")}
@@ -267,10 +293,11 @@ export function InventoryItemDialog({
                 >
                   {statusOptions.map((s) => (
                     <Option key={s.value} value={s.value}>
-                    {s.label}
+                      {s.label}
                     </Option>
                   ))}
                 </Select>
+
                 {errors.Status ? <FormHelperText>{errors.Status}</FormHelperText> : null}
               </FormControl>
             </Stack>
@@ -293,6 +320,7 @@ export function InventoryItemDialog({
               />
             </FormControl>
 
+            {/* Buttons */}
             <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ pt: 1 }}>
               <Button variant="outlined" color="neutral" onClick={onClose} disabled={submitting}>
                 Cancel

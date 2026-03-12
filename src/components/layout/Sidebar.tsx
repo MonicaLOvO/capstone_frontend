@@ -101,7 +101,13 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  const { logout, user } = useAuth();
+  const { logout, user, backendRoleName } = useAuth();
+  const roleLabel =
+    backendRoleName === "SuperAdmin"
+      ? "Super Admin"
+      : user?.role
+        ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+        : "";
 
   const { has } = usePermissions(userRole);
 
@@ -275,7 +281,7 @@ export default function Sidebar({
             <Box>
               <Typography level="body-sm">{user?.name ?? "…"}</Typography>
               <Typography level="body-xs" color="neutral">
-                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""}
+                {roleLabel}
               </Typography>
             </Box>
           )}

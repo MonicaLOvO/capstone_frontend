@@ -2,13 +2,15 @@
 
 import { Box, Input, Select, Option, Button, Typography } from "@mui/joy";
 import { useState, useEffect } from "react";
-import { Person } from "../PeopleTable";
+import { Person, type BackendRoleName } from "../PeopleTable";
 import { validateUser, ValidationErrors, UserFormInput } from "@/validation/user.validation";
 
 interface Props {
   mode: "create" | "edit";
   person?: Person | null;
   currentUserRole: Person["role"];
+  /** Backend role of current user – only SuperAdmin can change another Admin's role/status */
+  currentUserBackendRole?: BackendRoleName;
   departments: { id: string; name: string }[];
   /** Only roles that exist in DB (from GET /api/role/list) */
   availableRoles: { role: Person["role"]; label: string }[];
@@ -19,6 +21,7 @@ export function PersonForm({
   mode,
   person,
   currentUserRole,
+  currentUserBackendRole,
   departments,
   availableRoles,
   onSubmit,
@@ -57,6 +60,10 @@ export function PersonForm({
 
   const isEditing = mode === "edit";
   const isAdminTarget = person?.role === "admin";
+  // Only SuperAdmin may change another Admin's role/status; Admin cannot edit other Admins' role/status
+  const isSuperAdmin = currentUserBackendRole === "SuperAdmin";
+  const disableRoleAndStatusForTarget =
+    isAdminTarget && !isSuperAdmin;
 
   // In edit mode: if user already has a department, don't allow changing to "No Department"
   const hasExistingDepartment =
@@ -65,9 +72,15 @@ export function PersonForm({
     person.department !== "—" &&
     person.department.trim() !== "";
 
-  // Only show roles the current user can assign and that exist in DB
-  const selectableRoleOptions = availableRoles.filter(
-    (r) => currentUserRole === "admin" || r.role === "staff",
+  // Only SuperAdmin can assign Admin role; Admin can assign Manager/Staff only; Manager can assign Staff only.
+  const selectableRoleOptions = availableRoles.filter((r) =>
+    currentUserBackendRole === "SuperAdmin"
+      ? true
+      : currentUserBackendRole === "Admin"
+        ? r.role !== "admin"
+        : currentUserRole === "manager"
+          ? r.role === "staff"
+          : false,
   );
 
   // Move focus off the listbox option before it closes to avoid "Blocked aria-hidden" a11y warning
@@ -84,8 +97,8 @@ export function PersonForm({
 
         const requireUsername =
           isEditing &&
-          !!person?.username &&
-          person.username !== person?.email;
+          !!person?.username?.trim() &&
+          person.username.trim() !== person?.email?.trim();
         const validation = validateUser(form, { requireUsername });
         setErrors(validation);
 
@@ -171,7 +184,7 @@ export function PersonForm({
                 ? form.role
                 : selectableRoleOptions[0]?.role ?? "staff"
             }
-            disabled={isEditing && isAdminTarget}
+            disabled={isEditing && disableRoleAndStatusForTarget}
             onChange={(_, v) => {
               setForm({ ...form, role: v! });
               blurActiveElement();
@@ -228,7 +241,7 @@ export function PersonForm({
           </Typography>
           <Select
             value={form.status}
-            disabled={isAdminTarget}
+            disabled={isEditing && disableRoleAndStatusForTarget}
             onChange={(_, v) => {
               setForm({ ...form, status: v! });
               blurActiveElement();

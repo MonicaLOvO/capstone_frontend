@@ -3,6 +3,11 @@
 import React from "react";
 import { Dropdown, Menu, MenuButton, MenuItem, IconButton } from "@mui/joy";
 
+/**
+ * InventoryRowMenu
+ * - Three-dot menu for actions on each row
+ * - Calls the handlers passed from the inventory page
+ */
 export function InventoryRowMenu({
   onEdit,
   onQr,
@@ -14,6 +19,7 @@ export function InventoryRowMenu({
 }) {
   return (
     <Dropdown>
+      {/* Three-dot trigger button */}
       <MenuButton
         slots={{ root: IconButton }}
         slotProps={{
@@ -28,6 +34,7 @@ export function InventoryRowMenu({
         ⋯
       </MenuButton>
 
+      {/* Dropdown menu */}
       <Menu placement="bottom-end" variant="outlined">
         <MenuItem onClick={onEdit}>Edit</MenuItem>
         <MenuItem onClick={onQr}>QR Code</MenuItem>

@@ -11,7 +11,12 @@ import {
   Select,
   Sheet,
   Table,
-  Typography
+  Typography,
+  Modal,
+  ModalDialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from "@mui/joy";
 
 import SearchRounded from "@mui/icons-material/SearchRounded";
@@ -39,8 +44,6 @@ function money(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
-/* ---------- ORIGINAL STATUS COLORS ---------- */
-
 function statusChip(status: string) {
   switch (status) {
     case InventoryItemStatusEnum.InStock:
@@ -58,11 +61,9 @@ export default function InventoryPage() {
   const pageSize = 6;
 
   const [items, setItems] = useState<InventoryItem[]>([]);
-
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("");
   const [status, setStatus] = useState<InventoryItemStatusEnum | null>(null);
-
   const [page, setPage] = useState(1);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -72,6 +73,10 @@ export default function InventoryPage() {
 
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrModalValue, setQrModalValue] = useState("");
+
+  /* DELETE STATE */
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<InventoryItem | null>(null);
 
   const categoryOptions = useMemo(
     () => ["", "Electronics", "Furniture", "Safety", "Supplies", "Tools"],
@@ -87,8 +92,6 @@ export default function InventoryPage() {
     ],
     []
   );
-
-  /* ---------- LOAD ITEMS ---------- */
 
   useEffect(() => {
     async function fetchItems() {
@@ -115,8 +118,6 @@ export default function InventoryPage() {
     fetchItems();
   }, []);
 
-  /* ---------- FILTER ITEMS (NO setState EFFECT) ---------- */
-
   const filteredItems = useMemo(() => {
     let data = [...items];
 
@@ -132,21 +133,14 @@ export default function InventoryPage() {
       );
     }
 
-    if (category) {
-      data = data.filter((x) => x.category === category);
-    }
+    if (category) data = data.filter((x) => x.category === category);
 
-    if (status !== null) {
-      data = data.filter((x) => x.status === status);
-    }
+    if (status !== null) data = data.filter((x) => x.status === status);
 
     return data;
   }, [items, search, category, status]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredItems.length / pageSize)
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
 
   const pagedItems = filteredItems.slice(
     (page - 1) * pageSize,
@@ -160,16 +154,7 @@ export default function InventoryPage() {
   async function handleCreate(payload: Omit<InventoryItemDTO, "Id">) {
     await inventoryApi.create(payload);
     setCreateOpen(false);
-    setPage(1);
-
-    const res = await inventoryApi.list({
-      Page: 1,
-      PageSize: 1000,
-      OrderColumn: "ProductName",
-      OrderDirection: "asc"
-    });
-
-    setItems(res.items);
+    reloadItems();
   }
 
   async function handleEdit(payload: Omit<InventoryItemDTO, "Id">) {
@@ -181,8 +166,10 @@ export default function InventoryPage() {
     });
 
     setEditOpen(false);
-    setPage(1);
+    reloadItems();
+  }
 
+  async function reloadItems() {
     const res = await inventoryApi.list({
       Page: 1,
       PageSize: 1000,
@@ -193,33 +180,41 @@ export default function InventoryPage() {
     setItems(res.items);
   }
 
+  async function confirmDelete() {
+    if (!deleteItem) return;
+
+    await inventoryApi.remove(deleteItem.id);
+
+    setDeleteOpen(false);
+    setDeleteItem(null);
+
+    reloadItems();
+  }
+
   return (
     <Box>
 
       {/* HEADER */}
 
       <Box
-  sx={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    mb: 3
-  }}
->
-  <Box>
-    <Typography level="h1">Inventory</Typography>
-    <Typography level="body-sm" sx={{ color: "text.tertiary", mt: 0.5 }}>
-      Manage your inventory items
-    </Typography>
-  </Box>
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3
+        }}
+      >
+        <Box>
+          <Typography level="h1">Inventory</Typography>
+          <Typography level="body-sm" sx={{ color: "text.tertiary", mt: 0.5 }}>
+            Manage your inventory items
+          </Typography>
+        </Box>
 
-  <Button
-    size="sm"
-    onClick={() => setCreateOpen(true)}
-  >
-    + Add Product
-  </Button>
-</Box>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          + Add Product
+        </Button>
+      </Box>
 
       {/* FILTERS */}
 
@@ -238,11 +233,7 @@ export default function InventoryPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        <Select
-          value={status}
-          placeholder="Status"
-          onChange={(_, v) => setStatus(v)}
-        >
+        <Select value={status} placeholder="Status" onChange={(_, v) => setStatus(v)}>
           {statusOptions.map((s) => (
             <Option key={s.label} value={s.value}>
               {s.label}
@@ -267,15 +258,7 @@ export default function InventoryPage() {
 
       <Sheet variant="outlined" sx={{ borderRadius: "lg" }}>
         <Box sx={{ overflowX: "auto" }}>
-          <Table
-            hoverRow
-            stickyHeader
-            sx={{
-              minWidth: 850,
-              "--TableCell-paddingX": "12px",
-              "--TableCell-paddingY": "10px"
-            }}
-          >
+          <Table hoverRow stickyHeader sx={{ minWidth: 850 }}>
             <thead>
               <tr>
                 <th>Product</th>
@@ -303,11 +286,7 @@ export default function InventoryPage() {
                     <td>{money(it.unitPrice)}</td>
 
                     <td>
-                      <Chip
-                        color={chip.color}
-                        size="sm"
-                        variant="soft"
-                      >
+                      <Chip color={chip.color} size="sm" variant="soft">
                         {chip.label}
                       </Chip>
                     </td>
@@ -322,7 +301,10 @@ export default function InventoryPage() {
                           setQrModalValue(getQrValue(it));
                           setQrModalOpen(true);
                         }}
-                        onDelete={() => {}}
+                        onDelete={() => {
+                          setDeleteItem(it);
+                          setDeleteOpen(true);
+                        }}
                       />
                     </td>
                   </tr>
@@ -334,17 +316,8 @@ export default function InventoryPage() {
 
         {/* PAGINATION */}
 
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            p: 2
-          }}
-        >
-          <Button
-            disabled={page === 1}
-            onClick={() => setPage(page - 1)}
-          >
+        <Box sx={{ display: "flex", justifyContent: "space-between", p: 2 }}>
+          <Button disabled={page === 1} onClick={() => setPage(page - 1)}>
             Previous
           </Button>
 
@@ -352,10 +325,7 @@ export default function InventoryPage() {
             Page {page} of {totalPages}
           </Typography>
 
-          <Button
-            disabled={page === totalPages}
-            onClick={() => setPage(page + 1)}
-          >
+          <Button disabled={page === totalPages} onClick={() => setPage(page + 1)}>
             Next
           </Button>
         </Box>
@@ -405,6 +375,29 @@ export default function InventoryPage() {
         value={qrModalValue}
         onClose={() => setQrModalOpen(false)}
       />
+
+      {/* DELETE CONFIRMATION */}
+
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)}>
+        <ModalDialog variant="outlined">
+          <DialogTitle>Delete Item</DialogTitle>
+
+          <DialogContent>
+            Are you sure you want to delete{" "}
+            <strong>{deleteItem?.productName}</strong>?
+          </DialogContent>
+
+          <DialogActions>
+            <Button variant="plain" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+
+            <Button color="danger" onClick={confirmDelete}>
+              Yes, Delete
+            </Button>
+          </DialogActions>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

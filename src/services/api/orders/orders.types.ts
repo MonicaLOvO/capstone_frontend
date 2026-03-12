@@ -7,6 +7,7 @@ export type OrderItemDTO = {
   Id: string;
   OrderId?: string | null;
   InventoryItemId?: string | null;
+  ProductName?: string | null;
   Quantity?: number | string | null;
   UnitPrice?: number | string | null;
 };

@@ -4,6 +4,7 @@ export type OrderItem = {
   id: string;
   orderId: string;
   inventoryItemId: string;
+  productName: string;
   quantity: number;
   unitPrice: number;
 };
@@ -36,6 +37,7 @@ export function mapOrderItem(dto: OrderItemDTO): OrderItem {
     id: dto.Id,
     orderId: dto.OrderId ?? "",
     inventoryItemId: dto.InventoryItemId ?? "",
+    productName: dto.ProductName ?? "",
     quantity: toNumber(dto.Quantity),
     unitPrice: toNumber(dto.UnitPrice),
   };

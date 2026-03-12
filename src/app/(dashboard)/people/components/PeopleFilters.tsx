@@ -14,6 +14,8 @@ interface Props {
   onChange: (value: PeopleFiltersValue) => void;
   currentUserRole: "admin" | "manager" | "staff";
   departments: { id: string; name: string; isActive: boolean }[];
+  /** Role options from API (Admin, Manager, Staff – same as drawer); dynamic like department filter */
+  roleOptions: { value: string; label: string }[];
 }
 
 export function PeopleFilters({
@@ -21,6 +23,7 @@ export function PeopleFilters({
   onChange,
   currentUserRole,
   departments,
+  roleOptions,
 }: Props) {
   return (
     <Box
@@ -40,7 +43,7 @@ export function PeopleFilters({
         sx={{ minWidth: 260 }}
       />
 
-      {/* Role filter */}
+      {/* Role filter – dynamic from API (same roles as Add/Edit drawer) */}
       <Select
         placeholder="Role"
         value={value.roleName}
@@ -50,13 +53,11 @@ export function PeopleFilters({
         sx={{ minWidth: 160 }}
       >
         <Option value="">All Roles</Option>
-        {currentUserRole === "admin" && <Option value="admin">Admin</Option>}
-
-        {currentUserRole === "admin" && (
-          <Option value="manager">Manager</Option>
-        )}
-
-        <Option value="staff">Staff</Option>
+        {roleOptions.map((r) => (
+          <Option key={r.value} value={r.value}>
+            {r.label}
+          </Option>
+        ))}
       </Select>
 
       {/* Department filters */}

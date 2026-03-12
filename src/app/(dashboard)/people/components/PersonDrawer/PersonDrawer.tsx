@@ -2,7 +2,7 @@
 
 import { Drawer, Box, Typography, IconButton, Alert } from "@mui/joy";
 import CloseIcon from "@mui/icons-material/Close";
-import { Person } from "../PeopleTable";
+import { Person, type BackendRoleName } from "../PeopleTable";
 import { PersonForm } from "./PersonForm";
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   mode: "create" | "edit";
   person?: Person | null;
   currentUserRole: Person["role"];
+  /** Backend role – only SuperAdmin can change another Admin's role/status */
+  currentUserBackendRole?: BackendRoleName;
   departments: { id: string; name: string }[];
   /** Only roles that exist in DB (from GET /api/role/list) */
   availableRoles: { role: Person["role"]; label: string }[];
@@ -24,6 +26,7 @@ export function PersonDrawer({
   mode,
   person,
   currentUserRole,
+  currentUserBackendRole,
   departments,
   availableRoles,
   onClose,
@@ -76,6 +79,7 @@ export function PersonDrawer({
           departments={departments}
           availableRoles={availableRoles}
           currentUserRole={currentUserRole}
+          currentUserBackendRole={currentUserBackendRole}
           onSubmit={onSubmit}
         />
       </Box>

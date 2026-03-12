@@ -40,7 +40,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { UserRole } from "@/types/roles";
 import { useAuth } from "@/auth/AuthProvider";
 import { clearAuthCookie } from "@/lib/authCookies";
-import { useUserProfileMedia } from "@/hooks/useUserProfileMedia";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -102,8 +101,13 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  const { logout, user } = useAuth();
-  const { avatarUrl } = useUserProfileMedia(user?.id);
+  const { logout, user, backendRoleName } = useAuth();
+  const roleLabel =
+    backendRoleName === "SuperAdmin"
+      ? "Super Admin"
+      : user?.role
+        ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+        : "";
 
   const { has } = usePermissions(userRole);
 
@@ -271,15 +275,13 @@ export default function Sidebar({
             justifyContent: collapsed ? "center" : "flex-start",
           }}
         >
-          <Avatar size="sm" src={avatarUrl ?? undefined}>
-            {user?.name?.charAt(0).toUpperCase() ?? "U"}
-          </Avatar>
+          <Avatar size="sm" />
 
           {!collapsed && (
             <Box>
               <Typography level="body-sm">{user?.name ?? "…"}</Typography>
               <Typography level="body-xs" color="neutral">
-                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""}
+                {roleLabel}
               </Typography>
             </Box>
           )}

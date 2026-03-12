@@ -23,7 +23,7 @@ import { departmentsApi } from "@/services/api/departments/departments.api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export default function PeoplePage() {
-  const { role } = useAuth();
+  const { user, role, backendRoleName } = useAuth();
   const effectiveRole = role ?? "staff";
   const { has } = usePermissions(effectiveRole);
 
@@ -38,9 +38,13 @@ export default function PeoplePage() {
   const [roleIdMap, setRoleIdMap] = useState<
     Partial<Record<Person["role"], string>>
   >({});
-  /** Role options for Add/Edit Person dropdown (only roles that exist in DB) */
+  /** Role options for Add/Edit Person dropdown (assignable only: Admin, Manager, Staff – no SuperAdmin) */
   const [availableRoles, setAvailableRoles] = useState<
     { role: Person["role"]; label: string }[]
+  >([]);
+  /** All roles from API for filter dropdown (SuperAdmin, Admin, Manager, Staff) – dynamic like departments */
+  const [filterRoleOptions, setFilterRoleOptions] = useState<
+    { value: string; label: string }[]
   >([]);
 
   
@@ -143,6 +147,13 @@ export default function PeoplePage() {
       //     DepartmentName: filters.departmentName || undefined,
 
       const searchValue = debouncedSearch?.trim();
+      // Manager only sees Staff: when they pick "Staff" or "All Roles" request Staff; when they pick Admin/Manager/SuperAdmin request that role then we filter to Staff only (0 users).
+      const apiRoleName =
+        effectiveRole === "manager"
+          ? (filters.roleName === "" || filters.roleName === "Staff"
+              ? "Staff"
+              : filters.roleName)
+          : (filters.roleName || undefined);
 
       let response;
 
@@ -150,35 +161,40 @@ export default function PeoplePage() {
         response = await usersApi.list({
           Page: page,
           PageSize: pageSize,
-          RoleName: filters.roleName || undefined,
+          RoleName: apiRoleName,
           DepartmentName: filters.departmentName || undefined,
         });
       } else if (searchValue.includes("@")) {
-        // EMAIL SEARCH
         response = await usersApi.list({
           Page: page,
           PageSize: pageSize,
           Email: searchValue,
-          RoleName: filters.roleName || undefined,
+          RoleName: apiRoleName,
           DepartmentName: filters.departmentName || undefined,
         });
       } else {
-        // TRY FIRST NAME
         response = await usersApi.list({
           Page: page,
           PageSize: pageSize,
           FirstName: searchValue,
-          RoleName: filters.roleName || undefined,
+          RoleName: apiRoleName,
           DepartmentName: filters.departmentName || undefined,
         });
-
-        // ✅ fallback to LAST NAME if nothing found
         if ((response.Data?.length ?? 0) === 0) {
           response = await usersApi.list({
             Page: page,
             PageSize: pageSize,
             LastName: searchValue,
-            RoleName: filters.roleName || undefined,
+            RoleName: apiRoleName,
+            DepartmentName: filters.departmentName || undefined,
+          });
+        }
+        if ((response.Data?.length ?? 0) === 0) {
+          response = await usersApi.list({
+            Page: page,
+            PageSize: pageSize,
+            Email: searchValue,
+            RoleName: apiRoleName,
             DepartmentName: filters.departmentName || undefined,
           });
         }
@@ -197,29 +213,34 @@ export default function PeoplePage() {
         })),
       );
 
-      // Fetch roles so we use real IDs from DB (avoids RoleId FK error)
+      // Fetch roles so we use real IDs from DB (avoids RoleId FK error).
       const rolesResponse = await rolesApi.list();
       const roleList = rolesResponse.Data ?? [];
-      const backendToFrontend: Record<string, Person["role"]> = {
-        SuperAdmin: "admin",
-        Manager: "manager",
-        Staff: "staff",
-      };
       const labels: Record<Person["role"], string> = {
         admin: "Admin",
         manager: "Manager",
         staff: "Staff",
       };
       const map: Partial<Record<Person["role"], string>> = {};
-      for (const r of roleList) {
-        const key = backendToFrontend[r.RoleName];
-        if (key) map[key] = r.Id;
-      }
+      // Prefer "Admin" over "SuperAdmin" for the assignable "admin" option so we never assign SuperAdmin via UI.
+      const adminRole = roleList.find((r) => r.RoleName === "Admin") ?? roleList.find((r) => r.RoleName === "SuperAdmin");
+      if (adminRole) map.admin = adminRole.Id;
+      const managerRole = roleList.find((r) => r.RoleName === "Manager");
+      if (managerRole) map.manager = managerRole.Id;
+      const staffRole = roleList.find((r) => r.RoleName === "Staff");
+      if (staffRole) map.staff = staffRole.Id;
       setRoleIdMap(map);
       setAvailableRoles(
         (["admin", "manager", "staff"] as const)
           .filter((role) => map[role])
           .map((role) => ({ role, label: labels[role] })),
+      );
+      // Filter dropdown: all roles from API (SuperAdmin, Admin, Manager, Staff) – dynamic like departments.
+      setFilterRoleOptions(
+        roleList.map((r) => ({
+          value: r.RoleName,
+          label: r.RoleName === "SuperAdmin" ? "Super Admin" : r.RoleName,
+        })),
       );
     } finally {
       setLoading(false);
@@ -240,12 +261,19 @@ export default function PeoplePage() {
 
   const canCreatePerson = has("users.create") || has("staff.create");
 
-  /** Manager: only staff in table and can only add/edit/delete/disable staff. Admin: all users. */
+  /** When role filter is set, show only that role (Admin filter = only Admin, not Super Admin; backend may return both). */
+  const byRoleFilter = (list: Person[]) => {
+    if (!filters.roleName) return list;
+    return list.filter((p) => p.backendRoleName === filters.roleName);
+  };
+  /** Manager: only Staff in table. When role filter is Staff or All, API returns Staff. When filter is Admin/Manager/SuperAdmin, API returns that role and we filter to Staff → 0 users. */
   const visiblePeople =
-    effectiveRole === "manager"
-      ? people.filter((p) => p.role === "staff")
-      : effectiveRole === "admin"
-        ? people
+    effectiveRole === "admin"
+      ? byRoleFilter(people)
+      : effectiveRole === "manager"
+        ? filters.roleName === "" || filters.roleName === "Staff"
+          ? people
+          : people.filter((p) => p.role === "staff")
         : [];
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -310,12 +338,15 @@ export default function PeoplePage() {
         onChange={setFilters}
         currentUserRole={effectiveRole}
         departments={departments}
+        roleOptions={filterRoleOptions}
       />
 
       {/* Table */}
       <PeopleTable
         people={visiblePeople}
         loading={loading}
+        currentUserId={user?.id}
+        currentUserBackendRole={backendRoleName}
         onToggleStatus={toggleUserStatus}
         onEditPerson={(person) => {
           setEditingPerson(person);
@@ -341,7 +372,10 @@ export default function PeoplePage() {
 
             <Button
               variant="outlined"
-              disabled={page >= totalPages}
+              disabled={
+                page >= totalPages ||
+                (visiblePeople.length === 0 && page > 1)
+              }
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
               Next
@@ -357,6 +391,7 @@ export default function PeoplePage() {
         departments={selectableDepartments}
         availableRoles={availableRoles}
         currentUserRole={effectiveRole}
+        currentUserBackendRole={backendRoleName}
         submitError={submitError}
         onClose={() => {
           setDrawerOpen(false);

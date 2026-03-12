@@ -2,13 +2,15 @@
 
 import { Box, Input, Select, Option, Button, Typography } from "@mui/joy";
 import { useState, useEffect } from "react";
-import { Person } from "../PeopleTable";
+import { Person, type BackendRoleName } from "../PeopleTable";
 import { validateUser, ValidationErrors, UserFormInput } from "@/validation/user.validation";
 
 interface Props {
   mode: "create" | "edit";
   person?: Person | null;
   currentUserRole: Person["role"];
+  /** Backend role of current user – only SuperAdmin can change another Admin's role/status */
+  currentUserBackendRole?: BackendRoleName;
   departments: { id: string; name: string }[];
   /** Only roles that exist in DB (from GET /api/role/list) */
   availableRoles: { role: Person["role"]; label: string }[];
@@ -19,6 +21,7 @@ export function PersonForm({
   mode,
   person,
   currentUserRole,
+  currentUserBackendRole,
   departments,
   availableRoles,
   onSubmit,
@@ -37,11 +40,15 @@ export function PersonForm({
   const [form, setForm] = useState<FormState>(() => {
     const dept = person?.department ?? "";
     const department = dept && dept !== "—" ? dept : "";
+    // If username is missing or same as email (backend fallback), show empty so validation passes and we keep "use email"
+    const rawUsername = person?.username ?? "";
+    const username =
+      !rawUsername || rawUsername === person?.email ? "" : rawUsername;
     return {
       firstName: person?.firstName ?? "",
       lastName: person?.lastName ?? "",
       email: person?.email ?? "",
-      username: person?.username ?? "",
+      username,
       role: person?.role ?? "staff",
       department,
       status: person?.status ?? "active",
@@ -53,6 +60,10 @@ export function PersonForm({
 
   const isEditing = mode === "edit";
   const isAdminTarget = person?.role === "admin";
+  // Only SuperAdmin may change another Admin's role/status; Admin cannot edit other Admins' role/status
+  const isSuperAdmin = currentUserBackendRole === "SuperAdmin";
+  const disableRoleAndStatusForTarget =
+    isAdminTarget && !isSuperAdmin;
 
   // In edit mode: if user already has a department, don't allow changing to "No Department"
   const hasExistingDepartment =
@@ -61,9 +72,15 @@ export function PersonForm({
     person.department !== "—" &&
     person.department.trim() !== "";
 
-  // Only show roles the current user can assign and that exist in DB
-  const selectableRoleOptions = availableRoles.filter(
-    (r) => currentUserRole === "admin" || r.role === "staff",
+  // Only SuperAdmin can assign Admin role; Admin can assign Manager/Staff only; Manager can assign Staff only.
+  const selectableRoleOptions = availableRoles.filter((r) =>
+    currentUserBackendRole === "SuperAdmin"
+      ? true
+      : currentUserBackendRole === "Admin"
+        ? r.role !== "admin"
+        : currentUserRole === "manager"
+          ? r.role === "staff"
+          : false,
   );
 
   // Move focus off the listbox option before it closes to avoid "Blocked aria-hidden" a11y warning
@@ -78,7 +95,11 @@ export function PersonForm({
       onSubmit={(e) => {
         e.preventDefault();
 
-        const validation = validateUser(form);
+        const requireUsername =
+          isEditing &&
+          !!person?.username?.trim() &&
+          person.username.trim() !== person?.email?.trim();
+        const validation = validateUser(form, { requireUsername });
         setErrors(validation);
 
         if (Object.keys(validation).length > 0) return;
@@ -151,70 +172,92 @@ export function PersonForm({
         </Typography>
       )}
 
-      <Select
-        value={selectableRoleOptions.some((r) => r.role === form.role) ? form.role : (selectableRoleOptions[0]?.role ?? "staff")}
-        disabled={isEditing && isAdminTarget}
-        onChange={(_, v) => {
-          setForm({ ...form, role: v! });
-          blurActiveElement();
-        }}
-        slotProps={{
-          listbox: {
-            placement: "bottom-start",
-            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
-          },
-        }}
-      >
-        {selectableRoleOptions.map((r) => (
-          <Option key={r.role} value={r.role}>
-            {r.label}
-          </Option>
-        ))}
-      </Select>
+      {/* Role / Department / Status */}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+        <Box>
+          <Typography level="body-sm" sx={{ mb: 0.5, color: "text.secondary" }}>
+            Role
+          </Typography>
+          <Select
+            value={
+              selectableRoleOptions.some((r) => r.role === form.role)
+                ? form.role
+                : selectableRoleOptions[0]?.role ?? "staff"
+            }
+            disabled={isEditing && disableRoleAndStatusForTarget}
+            onChange={(_, v) => {
+              setForm({ ...form, role: v! });
+              blurActiveElement();
+            }}
+            slotProps={{
+              listbox: {
+                placement: "bottom-start",
+                sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+              },
+            }}
+          >
+            {selectableRoleOptions.map((r) => (
+              <Option key={r.role} value={r.role}>
+                {r.label}
+              </Option>
+            ))}
+          </Select>
+        </Box>
 
-      <Select
-        size="md"
-        placeholder="Department"
-        value={form.department}
-        onChange={(_, v) => {
-          setForm({ ...form, department: v ?? "" });
-          blurActiveElement();
-        }}
-        slotProps={{
-          listbox: {
-            placement: "bottom-start",
-            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
-          },
-        }}
-      >
-        <Option value="" disabled={hasExistingDepartment}>
-          No Department
-        </Option>
+        <Box>
+          <Typography level="body-sm" sx={{ mb: 0.5, color: "text.secondary" }}>
+            Department
+          </Typography>
+          <Select
+            size="md"
+            placeholder="Department"
+            value={form.department}
+            onChange={(_, v) => {
+              setForm({ ...form, department: v ?? "" });
+              blurActiveElement();
+            }}
+            slotProps={{
+              listbox: {
+                placement: "bottom-start",
+                sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+              },
+            }}
+          >
+            <Option value="" disabled={hasExistingDepartment}>
+              No Department
+            </Option>
 
-        {departments.map((d) => (
-          <Option key={d.id} value={d.name}>
-            {d.name}
-          </Option>
-        ))}
-      </Select>
+            {departments.map((d) => (
+              <Option key={d.id} value={d.name}>
+                {d.name}
+              </Option>
+            ))}
+          </Select>
+        </Box>
 
-      <Select
-        value={form.status}
-        disabled={isAdminTarget}
-        onChange={(_, v) => {
-          setForm({ ...form, status: v! });
-          blurActiveElement();
-        }}
-        slotProps={{
-          listbox: {
-            placement: "bottom-start",
-            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
-          },
-        }}
-      >
-        <Option value="active">Active</Option>
-        <Option value="inactive">Inactive</Option>
-      </Select>
+        <Box>
+          <Typography level="body-sm" sx={{ mb: 0.5, color: "text.secondary" }}>
+            Status
+          </Typography>
+          <Select
+            value={form.status}
+            disabled={isEditing && disableRoleAndStatusForTarget}
+            onChange={(_, v) => {
+              setForm({ ...form, status: v! });
+              blurActiveElement();
+            }}
+            slotProps={{
+              listbox: {
+                placement: "bottom-start",
+                sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+              },
+            }}
+          >
+            <Option value="active">Active</Option>
+            <Option value="inactive">Inactive</Option>
+          </Select>
+        </Box>
+      </Box>
 
       <Button type="submit" sx={{ mt: "auto" }}>
         {mode === "create" ? "Create User" : "Save Changes"}

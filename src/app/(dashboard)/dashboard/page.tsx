@@ -32,7 +32,27 @@ import { useAuth } from "@/auth/AuthProvider";
 
 const MotionCard = motion(Card);
 
-const COLORS = ["#4f46e5", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
+const COLORS = [
+  "#4f46e5",
+  "#22c55e",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6"
+];
+
+interface ActivityItem {
+  text: string;
+}
+
+interface ChartItem {
+  name: string;
+  orders: number;
+}
+
+interface CategoryItem {
+  name: string;
+  value: number;
+}
 
 function StatCard({
   title,
@@ -61,17 +81,23 @@ function StatCard({
         {title}
       </Typography>
 
-      <Typography level="h2">{value}</Typography>
+      <Typography level="h2">
+        {value}
+      </Typography>
     </MotionCard>
   );
 }
 
-function statusChip(status: number) {
+function statusChip(status: InventoryItemStatusEnum) {
+
   switch (status) {
+
     case InventoryItemStatusEnum.InStock:
       return <Chip color="success">In Stock</Chip>;
+
     case InventoryItemStatusEnum.LowStock:
       return <Chip color="warning">Low Stock</Chip>;
+
     default:
       return <Chip color="danger">Out of Stock</Chip>;
   }
@@ -95,10 +121,10 @@ export default function DashboardPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
 
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<ChartItem[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryItem[]>([]);
 
-  const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
 
@@ -118,9 +144,9 @@ export default function DashboardPage() {
         setInventoryCount(items.length);
 
         const lowStock = items.filter(
-          (i: any) =>
-            i.status === InventoryItemStatusEnum.LowStock ||
-            i.status === InventoryItemStatusEnum.OutStock
+          (item) =>
+            item.status === InventoryItemStatusEnum.LowStock ||
+            item.status === InventoryItemStatusEnum.OutStock
         );
 
         setLowStockCount(lowStock.length);
@@ -128,17 +154,22 @@ export default function DashboardPage() {
 
         /* CATEGORY DATA */
 
-        const categoryMap: any = {};
+        const categoryMap: Record<string, number> = {};
 
-        items.forEach((item: any) => {
-          const cat = item.category ?? "Other";
-          categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+        items.forEach((item) => {
+
+          const category = item.category ?? "Other";
+
+          categoryMap[category] =
+            (categoryMap[category] ?? 0) + 1;
+
         });
 
-        const categoryChart = Object.keys(categoryMap).map((key) => ({
-          name: key,
-          value: categoryMap[key]
-        }));
+        const categoryChart: CategoryItem[] =
+          Object.keys(categoryMap).map((key) => ({
+            name: key,
+            value: categoryMap[key]
+          }));
 
         setCategoryData(categoryChart);
 
@@ -156,40 +187,46 @@ export default function DashboardPage() {
         const today = new Date().toDateString();
 
         const todaysOrders = orders.filter(
-          (o: any) =>
-            new Date(o.createdAt).toDateString() === today
+          (order) =>
+            new Date(order.createdAt).toDateString() === today
         );
 
         setOrdersToday(todaysOrders.length);
 
-        /* CHART */
+        /* ORDER CHART */
 
-        const chart = orders.slice(0, 7).map((o: any, i: number) => ({
-          name: `Day ${i + 1}`,
-          orders: o.totalItems ?? 1
-        }));
+        const chart: ChartItem[] =
+          orders.slice(0, 7).map((order, index) => ({
+            name: `Day ${index + 1}`,
+            orders: order.totalItems ?? 1
+          }));
 
         setChartData(chart);
 
         /* ACTIVITY FEED */
 
-        const activity = [
-          ...orders.slice(0, 3).map((o: any) => ({
-            text: `Order #${o.id} created`,
-            time: "recent"
+        const activity: ActivityItem[] = [
+
+          ...orders.slice(0, 3).map((order) => ({
+            text: `Order #${order.id} created`
           })),
-          ...lowStock.slice(0, 2).map((i: any) => ({
-            text: `${i.productName} low stock`,
-            time: "inventory"
+
+          ...lowStock.slice(0, 2).map((item) => ({
+            text: `${item.productName} low stock`
           }))
+
         ];
 
         setActivityFeed(activity);
 
-      } catch (err) {
-        console.error("Dashboard load failed", err);
+      } catch (error) {
+
+        console.error("Dashboard load failed", error);
+
       } finally {
+
         setLoading(false);
+
       }
     }
 
@@ -200,7 +237,7 @@ export default function DashboardPage() {
   return (
     <Box>
 
-      {/* WELCOME HEADER */}
+      {/* HEADER */}
 
       <Box sx={{ mb: 3 }}>
 
@@ -208,7 +245,10 @@ export default function DashboardPage() {
           Welcome, {firstName}
         </Typography>
 
-        <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
+        <Typography
+          level="body-sm"
+          sx={{ color: "text.tertiary" }}
+        >
           Here is what's happening in your warehouse today.
         </Typography>
 
@@ -222,7 +262,10 @@ export default function DashboardPage() {
           {loading ? (
             <Skeleton height={90} />
           ) : (
-            <StatCard title="Inventory Items" value={inventoryCount} />
+            <StatCard
+              title="Inventory Items"
+              value={inventoryCount}
+            />
           )}
         </Grid>
 
@@ -230,7 +273,10 @@ export default function DashboardPage() {
           {loading ? (
             <Skeleton height={90} />
           ) : (
-            <StatCard title="Low Stock Items" value={lowStockCount} />
+            <StatCard
+              title="Low Stock Items"
+              value={lowStockCount}
+            />
           )}
         </Grid>
 
@@ -238,7 +284,10 @@ export default function DashboardPage() {
           {loading ? (
             <Skeleton height={90} />
           ) : (
-            <StatCard title="Orders Today" value={ordersToday} />
+            <StatCard
+              title="Orders Today"
+              value={ordersToday}
+            />
           )}
         </Grid>
 
@@ -249,34 +298,53 @@ export default function DashboardPage() {
       <Grid container spacing={2} sx={{ mb: 3 }}>
 
         <Grid xs={12} md={6}>
+
           <Card sx={{ p: 2 }}>
-            <Typography level="title-md">Order Activity</Typography>
+
+            <Typography level="title-md">
+              Order Activity
+            </Typography>
 
             <Box sx={{ height: 250 }}>
 
               {loading ? (
                 <Skeleton height={250} />
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
+
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
+
                   <LineChart data={chartData}>
+
                     <XAxis dataKey="name" />
+
                     <Tooltip />
+
                     <Line
                       type="monotone"
                       dataKey="orders"
                       stroke="#4f46e5"
                       strokeWidth={3}
                     />
+
                   </LineChart>
+
                 </ResponsiveContainer>
+
               )}
 
             </Box>
+
           </Card>
+
         </Grid>
 
         <Grid xs={12} md={6}>
+
           <Card sx={{ p: 2 }}>
+
             <Typography level="title-md">
               Inventory Categories
             </Typography>
@@ -286,8 +354,14 @@ export default function DashboardPage() {
               {loading ? (
                 <Skeleton height={250} />
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
+
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
+
                   <PieChart>
+
                     <Pie
                       data={categoryData}
                       dataKey="value"
@@ -295,83 +369,141 @@ export default function DashboardPage() {
                       outerRadius={90}
                       label
                     >
+
                       {categoryData.map((entry, index) => (
-                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
+
+                        <Cell
+                          key={index}
+                          fill={
+                            COLORS[index % COLORS.length]
+                          }
+                        />
+
                       ))}
+
                     </Pie>
+
                   </PieChart>
+
                 </ResponsiveContainer>
+
               )}
 
             </Box>
+
           </Card>
+
         </Grid>
 
       </Grid>
 
-      {/* TABLES + ACTIVITY */}
+      {/* TABLES */}
 
       <Grid container spacing={2}>
 
         {/* LOW STOCK */}
 
         <Grid xs={12} md={4}>
+
           <Card sx={{ p: 2 }}>
-            <Typography level="title-md">Low Stock Alerts</Typography>
+
+            <Typography level="title-md">
+              Low Stock Alerts
+            </Typography>
 
             <Table size="sm">
+
               <tbody>
+
                 {lowStockItems.map((item) => (
+
                   <tr key={item.id}>
+
                     <td>{item.productName}</td>
+
                     <td>{item.quantity}</td>
-                    <td>{statusChip(item.status)}</td>
+
+                    <td>
+                      {statusChip(item.status)}
+                    </td>
+
                   </tr>
+
                 ))}
+
               </tbody>
+
             </Table>
+
           </Card>
+
         </Grid>
 
         {/* RECENT ORDERS */}
 
         <Grid xs={12} md={4}>
+
           <Card sx={{ p: 2 }}>
-            <Typography level="title-md">Recent Orders</Typography>
+
+            <Typography level="title-md">
+              Recent Orders
+            </Typography>
 
             <Table size="sm">
+
               <tbody>
+
                 {recentOrders.map((order) => (
+
                   <tr key={order.id}>
+
                     <td>{order.id}</td>
+
                     <td>
                       <Chip size="sm">
                         {order.status ?? "Pending"}
                       </Chip>
                     </td>
+
                   </tr>
+
                 ))}
+
               </tbody>
+
             </Table>
+
           </Card>
+
         </Grid>
 
         {/* ACTIVITY FEED */}
 
         <Grid xs={12} md={4}>
+
           <Card sx={{ p: 2 }}>
-            <Typography level="title-md">Activity Feed</Typography>
+
+            <Typography level="title-md">
+              Activity Feed
+            </Typography>
 
             <Stack spacing={1.2} sx={{ mt: 1 }}>
 
-              {activityFeed.map((a, i) => (
-                <Typography key={i} level="body-sm">
-                  • {a.text}
+              {activityFeed.map((activity, index) => (
+
+                <Typography
+                  key={index}
+                  level="body-sm"
+                >
+                  • {activity.text}
                 </Typography>
+
               ))}
 
             </Stack>
+
           </Card>
+
         </Grid>
 
       </Grid>

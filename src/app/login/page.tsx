@@ -6,6 +6,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { setAuthCookie } from "@/lib/authCookies";
 
 export default function LoginPage() {
+
   const router = useRouter();
   const { login } = useAuth();
 
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   function validate() {
+
     if (!username.trim()) {
       setError("Username or email is required");
       return false;
@@ -31,7 +33,8 @@ export default function LoginPage() {
     return true;
   }
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+
     e.preventDefault();
 
     setError(null);
@@ -41,6 +44,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+
       const res = await fetch("http://localhost:4000/api/user/login", {
         method: "POST",
         headers: {
@@ -57,7 +61,8 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      const token = data?.Data?.token;
+
+      const token: string | undefined = data?.Data?.token;
 
       if (!token) {
         throw new Error("Invalid login response");
@@ -65,12 +70,18 @@ export default function LoginPage() {
 
       setAuthCookie(token);
 
-      await login(token, data?.Data?.user);
+      await login(token);
 
       router.push("/dashboard");
 
-    } catch (err: any) {
-      setError(err.message || "Login failed");
+    } catch (err: unknown) {
+
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Login failed");
+      }
+
     } finally {
       setLoading(false);
     }
@@ -78,10 +89,7 @@ export default function LoginPage() {
 
   return (
     <div style={styles.page}>
-
       <div style={styles.container}>
-
-        {/* Header */}
 
         <div style={styles.header}>
           <h1 style={styles.title}>Sign in</h1>
@@ -90,19 +98,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Error */}
-
-        {error && (
-          <div style={styles.error}>
-            {error}
-          </div>
-        )}
-
-        {/* Form */}
+        {error && <div style={styles.error}>{error}</div>}
 
         <form onSubmit={handleLogin}>
-
-          {/* Username */}
 
           <label style={styles.label}>
             Username or Email
@@ -115,8 +113,6 @@ export default function LoginPage() {
             onChange={(e) => setUsername(e.target.value)}
             style={styles.input}
           />
-
-          {/* Password */}
 
           <label style={styles.label}>
             Password
@@ -140,8 +136,6 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {/* Button */}
-
           <button
             type="submit"
             disabled={loading}
@@ -157,7 +151,6 @@ export default function LoginPage() {
         </div>
 
       </div>
-
     </div>
   );
 }

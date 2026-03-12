@@ -32,11 +32,20 @@ async function request<T>(
 ): Promise<ApiResponse<T>> {
   //reads token from localstorage .... 
   const token = getToken();
+  const isFormDataBody =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+  const defaultHeaders: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
+
+  if (!isFormDataBody) {
+    defaultHeaders["Content-Type"] = "application/json";
+  }
+
   //if token exists, u automatically attach .. you never manually attach token again..
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...defaultHeaders,
       ...(options.headers || {}),
     },
     ...options,

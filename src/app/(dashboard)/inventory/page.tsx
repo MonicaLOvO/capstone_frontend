@@ -41,7 +41,7 @@ function money(n: number) {
 
 /* ---------- ORIGINAL STATUS COLORS ---------- */
 
-function statusChip(status: InventoryItemStatusEnum) {
+function statusChip(status: string) {
   switch (status) {
     case InventoryItemStatusEnum.InStock:
       return { label: "In Stock", color: "success" as const };

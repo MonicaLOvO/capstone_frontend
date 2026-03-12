@@ -40,6 +40,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { UserRole } from "@/types/roles";
 import { useAuth } from "@/auth/AuthProvider";
 import { clearAuthCookie } from "@/lib/authCookies";
+import { useUserProfileMedia } from "@/hooks/useUserProfileMedia";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -102,6 +103,7 @@ export default function Sidebar({
   const router = useRouter();
 
   const { logout, user } = useAuth();
+  const { avatarUrl } = useUserProfileMedia(user?.id);
 
   const { has } = usePermissions(userRole);
 
@@ -269,7 +271,9 @@ export default function Sidebar({
             justifyContent: collapsed ? "center" : "flex-start",
           }}
         >
-          <Avatar size="sm" />
+          <Avatar size="sm" src={avatarUrl ?? undefined}>
+            {user?.name?.charAt(0).toUpperCase() ?? "U"}
+          </Avatar>
 
           {!collapsed && (
             <Box>

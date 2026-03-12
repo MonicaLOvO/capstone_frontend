@@ -23,7 +23,7 @@ import { departmentsApi } from "@/services/api/departments/departments.api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export default function PeoplePage() {
-  const { role } = useAuth();
+  const { role, backendRoleName } = useAuth();
   const effectiveRole = role ?? "staff";
   const { has } = usePermissions(effectiveRole);
 
@@ -163,7 +163,7 @@ export default function PeoplePage() {
           DepartmentName: filters.departmentName || undefined,
         });
       } else {
-        // TRY FIRST NAME
+        // Try FirstName, then LastName, then Email so e.g. "SuperAdmin" can match SuperAdmin@... email
         response = await usersApi.list({
           Page: page,
           PageSize: pageSize,
@@ -171,13 +171,20 @@ export default function PeoplePage() {
           RoleName: filters.roleName || undefined,
           DepartmentName: filters.departmentName || undefined,
         });
-
-        // ✅ fallback to LAST NAME if nothing found
         if ((response.Data?.length ?? 0) === 0) {
           response = await usersApi.list({
             Page: page,
             PageSize: pageSize,
             LastName: searchValue,
+            RoleName: filters.roleName || undefined,
+            DepartmentName: filters.departmentName || undefined,
+          });
+        }
+        if ((response.Data?.length ?? 0) === 0) {
+          response = await usersApi.list({
+            Page: page,
+            PageSize: pageSize,
+            Email: searchValue,
             RoleName: filters.roleName || undefined,
             DepartmentName: filters.departmentName || undefined,
           });
@@ -197,24 +204,23 @@ export default function PeoplePage() {
         })),
       );
 
-      // Fetch roles so we use real IDs from DB (avoids RoleId FK error)
+      // Fetch roles so we use real IDs from DB (avoids RoleId FK error).
+      // SuperAdmin is excluded from assignable roles (dev-only); filter and dropdown show only Admin, Manager, Staff.
       const rolesResponse = await rolesApi.list();
       const roleList = rolesResponse.Data ?? [];
-      const backendToFrontend: Record<string, Person["role"]> = {
-        SuperAdmin: "admin",
-        Manager: "manager",
-        Staff: "staff",
-      };
       const labels: Record<Person["role"], string> = {
         admin: "Admin",
         manager: "Manager",
         staff: "Staff",
       };
       const map: Partial<Record<Person["role"], string>> = {};
-      for (const r of roleList) {
-        const key = backendToFrontend[r.RoleName];
-        if (key) map[key] = r.Id;
-      }
+      // Prefer "Admin" over "SuperAdmin" for the assignable "admin" option so we never assign SuperAdmin via UI.
+      const adminRole = roleList.find((r) => r.RoleName === "Admin") ?? roleList.find((r) => r.RoleName === "SuperAdmin");
+      if (adminRole) map.admin = adminRole.Id;
+      const managerRole = roleList.find((r) => r.RoleName === "Manager");
+      if (managerRole) map.manager = managerRole.Id;
+      const staffRole = roleList.find((r) => r.RoleName === "Staff");
+      if (staffRole) map.staff = staffRole.Id;
       setRoleIdMap(map);
       setAvailableRoles(
         (["admin", "manager", "staff"] as const)
@@ -310,12 +316,14 @@ export default function PeoplePage() {
         onChange={setFilters}
         currentUserRole={effectiveRole}
         departments={departments}
+        roleOptions={availableRoles.map((r) => ({ value: r.role, label: r.label }))}
       />
 
       {/* Table */}
       <PeopleTable
         people={visiblePeople}
         loading={loading}
+        currentUserBackendRole={backendRoleName}
         onToggleStatus={toggleUserStatus}
         onEditPerson={(person) => {
           setEditingPerson(person);

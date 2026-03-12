@@ -17,8 +17,14 @@ export type UserFormInput = {
 
 export type ValidationErrors<T> = Partial<Record<keyof T, string>>;
 
+export type ValidateUserOptions = {
+  /** When true (e.g. edit mode and user already has a real username), username cannot be cleared */
+  requireUsername?: boolean;
+};
+
 export function validateUser(
-  data: UserFormInput
+  data: UserFormInput,
+  options?: ValidateUserOptions
 ): ValidationErrors<UserFormInput> {
   const errors: ValidationErrors<UserFormInput> = {};
 
@@ -44,9 +50,11 @@ export function validateUser(
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
     errors.email = "Invalid email";
 
-  // USERNAME (optional; when provided: 2–50 chars, letters/numbers/space/hyphen/underscore/period/apostrophe)
+  // USERNAME (optional unless requireUsername; when provided: 2–50 chars, letters/numbers/space/hyphen/underscore/period)
   const username = typeof data.username === "string" ? data.username.trim() : "";
-  if (username.length > 0) {
+  if (options?.requireUsername && username.length === 0) {
+    errors.username = "Username is required and cannot be cleared once set.";
+  } else if (username.length > 0) {
     if (username.length < 2 || username.length > 50)
       errors.username = "Username must be 2–50 characters";
     else if (!/^[a-zA-Z0-9\s._'-]+$/.test(username))

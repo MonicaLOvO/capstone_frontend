@@ -82,3 +82,47 @@ Use this checklist to confirm token, session, and role-based permissions work as
 - **Token/session:** `src/auth/` (AuthProvider, session, token), `src/lib/authCookies.ts`
 - **Middleware (cookie check):** `src/middleware.ts`
 - **AuthGuard:** `src/components/AuthGuard.tsx` — wraps dashboard layout; redirects to `/login` if not authenticated, shows "Loading..." while resolving auth.
+
+---
+
+## 6. Hardcoding check (Sidebar, People, Departments)
+
+- **Sidebar:** Uses `userRole` from Auth (JWT). Nav items and permission keys from `config/navigation.tsx` and `config/permissions.ts`. No role IDs or API data hardcoded. Only logic: “show Departments link when `userRole === 'admin'`”.
+- **People page:** Role list and IDs from `GET /api/role/list` → `roleIdMap`, `availableRoles`. Role filter options and Add/Edit role dropdown both use `availableRoles`. Departments in filters and drawer from `GET /api/department/list`. Table data from `GET /api/user/list`. No role or department IDs hardcoded.
+- **Departments page:** Department list from `GET /api/department/list`. Access control: `role === 'admin'` from Auth. No department IDs or lists hardcoded.
+- **By design:** Frontend role names (`admin` | `manager` | `staff`) and permission keys (e.g. `people.view`) are fixed in config; that is the app’s permission model, not backend data.
+
+---
+
+## 7. Steps to check overall functionality
+
+1. **Login & token**
+   - Log in with a valid user. In DevTools → Application → Local Storage, confirm `wms_token` exists. In Cookies, confirm `session-token` exists.
+   - Refresh the page: you should stay logged in and see the same user/role in the sidebar.
+
+2. **Logout & 401**
+   - Log out: both token and cookie should be cleared. Visit `/dashboard` or `/people`: you should be redirected to `/login`.
+   - (Optional) If the API returns 401, the app should clear session and redirect to login.
+
+3. **Sidebar by role**
+   - **Staff:** Sidebar shows Dashboard, Inventory, Orders, Reports. No “People Management”, no “Departments”.
+   - **Manager:** Same as Staff, plus “People Management”. No “Departments”.
+   - **Admin:** Same as Manager, plus “Departments”.
+   - Bottom of sidebar shows the logged-in user’s name and role (e.g. Admin, Manager, Staff).
+
+4. **URL protection**
+   - As **Staff**, open `/people` or `/departments` directly: you should be redirected to `/dashboard` (or login if not authenticated).
+   - As **Manager**, open `/departments`: redirect to dashboard. Open `/people`: page loads.
+   - As **Admin**, both `/people` and `/departments` load.
+
+5. **People page**
+   - **Filters:** Role and Department dropdowns show options from the API (same as Add/Edit). Change filters and confirm the table updates (and/or API is called with the right params).
+   - **Search:** Type a name, part of email, or “SuperAdmin”; results should update (search tries FirstName, LastName, then Email).
+   - **Add Person:** Open “+ Add Person”. Role dropdown shows only Admin, Manager, Staff (from API). Department dropdown shows departments from API. Create a user and confirm they appear in the table with the chosen role/department.
+   - **Edit/Delete/Disable:** As **Admin** (not SuperAdmin), you must not see Edit/Delete/Disable on other Admin users. As **SuperAdmin**, you can act on everyone. As **Manager**, you can act only on Staff. Confirm row actions match this.
+
+6. **Departments page (Admin only)**
+   - As Admin, open Departments. Table lists departments from API. Add Department: enter name and optional description, save; new department appears. Edit/disable/delete if the UI supports it; confirm list updates.
+
+7. **Other pages**
+   - Dashboard, Inventory, Orders, Reports: load without errors for roles that have the corresponding sidebar links. No need to test every feature; confirm navigation and that the app doesn’t break.

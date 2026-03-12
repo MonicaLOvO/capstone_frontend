@@ -37,11 +37,15 @@ export function PersonForm({
   const [form, setForm] = useState<FormState>(() => {
     const dept = person?.department ?? "";
     const department = dept && dept !== "—" ? dept : "";
+    // If username is missing or same as email (backend fallback), show empty so validation passes and we keep "use email"
+    const rawUsername = person?.username ?? "";
+    const username =
+      !rawUsername || rawUsername === person?.email ? "" : rawUsername;
     return {
       firstName: person?.firstName ?? "",
       lastName: person?.lastName ?? "",
       email: person?.email ?? "",
-      username: person?.username ?? "",
+      username,
       role: person?.role ?? "staff",
       department,
       status: person?.status ?? "active",
@@ -78,7 +82,11 @@ export function PersonForm({
       onSubmit={(e) => {
         e.preventDefault();
 
-        const validation = validateUser(form);
+        const requireUsername =
+          isEditing &&
+          !!person?.username &&
+          person.username !== person?.email;
+        const validation = validateUser(form, { requireUsername });
         setErrors(validation);
 
         if (Object.keys(validation).length > 0) return;
@@ -151,70 +159,92 @@ export function PersonForm({
         </Typography>
       )}
 
-      <Select
-        value={selectableRoleOptions.some((r) => r.role === form.role) ? form.role : (selectableRoleOptions[0]?.role ?? "staff")}
-        disabled={isEditing && isAdminTarget}
-        onChange={(_, v) => {
-          setForm({ ...form, role: v! });
-          blurActiveElement();
-        }}
-        slotProps={{
-          listbox: {
-            placement: "bottom-start",
-            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
-          },
-        }}
-      >
-        {selectableRoleOptions.map((r) => (
-          <Option key={r.role} value={r.role}>
-            {r.label}
-          </Option>
-        ))}
-      </Select>
+      {/* Role / Department / Status */}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+        <Box>
+          <Typography level="body-sm" sx={{ mb: 0.5, color: "text.secondary" }}>
+            Role
+          </Typography>
+          <Select
+            value={
+              selectableRoleOptions.some((r) => r.role === form.role)
+                ? form.role
+                : selectableRoleOptions[0]?.role ?? "staff"
+            }
+            disabled={isEditing && isAdminTarget}
+            onChange={(_, v) => {
+              setForm({ ...form, role: v! });
+              blurActiveElement();
+            }}
+            slotProps={{
+              listbox: {
+                placement: "bottom-start",
+                sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+              },
+            }}
+          >
+            {selectableRoleOptions.map((r) => (
+              <Option key={r.role} value={r.role}>
+                {r.label}
+              </Option>
+            ))}
+          </Select>
+        </Box>
 
-      <Select
-        size="md"
-        placeholder="Department"
-        value={form.department}
-        onChange={(_, v) => {
-          setForm({ ...form, department: v ?? "" });
-          blurActiveElement();
-        }}
-        slotProps={{
-          listbox: {
-            placement: "bottom-start",
-            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
-          },
-        }}
-      >
-        <Option value="" disabled={hasExistingDepartment}>
-          No Department
-        </Option>
+        <Box>
+          <Typography level="body-sm" sx={{ mb: 0.5, color: "text.secondary" }}>
+            Department
+          </Typography>
+          <Select
+            size="md"
+            placeholder="Department"
+            value={form.department}
+            onChange={(_, v) => {
+              setForm({ ...form, department: v ?? "" });
+              blurActiveElement();
+            }}
+            slotProps={{
+              listbox: {
+                placement: "bottom-start",
+                sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+              },
+            }}
+          >
+            <Option value="" disabled={hasExistingDepartment}>
+              No Department
+            </Option>
 
-        {departments.map((d) => (
-          <Option key={d.id} value={d.name}>
-            {d.name}
-          </Option>
-        ))}
-      </Select>
+            {departments.map((d) => (
+              <Option key={d.id} value={d.name}>
+                {d.name}
+              </Option>
+            ))}
+          </Select>
+        </Box>
 
-      <Select
-        value={form.status}
-        disabled={isAdminTarget}
-        onChange={(_, v) => {
-          setForm({ ...form, status: v! });
-          blurActiveElement();
-        }}
-        slotProps={{
-          listbox: {
-            placement: "bottom-start",
-            sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
-          },
-        }}
-      >
-        <Option value="active">Active</Option>
-        <Option value="inactive">Inactive</Option>
-      </Select>
+        <Box>
+          <Typography level="body-sm" sx={{ mb: 0.5, color: "text.secondary" }}>
+            Status
+          </Typography>
+          <Select
+            value={form.status}
+            disabled={isAdminTarget}
+            onChange={(_, v) => {
+              setForm({ ...form, status: v! });
+              blurActiveElement();
+            }}
+            slotProps={{
+              listbox: {
+                placement: "bottom-start",
+                sx: { width: "var(--Select-triggerWidth)", maxWidth: "100%" },
+              },
+            }}
+          >
+            <Option value="active">Active</Option>
+            <Option value="inactive">Inactive</Option>
+          </Select>
+        </Box>
+      </Box>
 
       <Button type="submit" sx={{ mt: "auto" }}>
         {mode === "create" ? "Create User" : "Save Changes"}

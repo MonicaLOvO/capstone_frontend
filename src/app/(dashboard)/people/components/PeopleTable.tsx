@@ -5,6 +5,9 @@ import { PeopleRowMenu } from "./PeopleRowMenu";
 import { useAuth } from "@/auth/AuthProvider";
 import { usePermissions } from "@/hooks/usePermissions";
 
+/** Backend role name – used for "only SuperAdmin can edit/delete Admin users" */
+export type BackendRoleName = "SuperAdmin" | "Admin" | "Manager" | "Staff";
+
 /**
  * Shared Person type
  * (exported so page.tsx can reuse safely)
@@ -17,6 +20,8 @@ export type Person = {
   /** Display name for sidebar when logged in; may differ from email.  */
   username?: string;
   role: "admin" | "manager" | "staff";
+  /** Backend role name – e.g. "Admin" vs "SuperAdmin" for permission rules */
+  backendRoleName?: BackendRoleName;
   department: string;
   status: "active" | "inactive";
   createdAt: string;
@@ -25,6 +30,8 @@ export type Person = {
 interface Props {
   people: Person[];
   loading?: boolean;
+  /** Backend role of current user – only SuperAdmin can edit/delete/disable Admin users */
+  currentUserBackendRole?: BackendRoleName;
   onEditPerson?: (person: Person) => void;
   onDeletePerson?: (person: Person) => void;
   onToggleStatus?: (person: Person) => void;
@@ -34,6 +41,7 @@ interface Props {
 export function PeopleTable({
   people,
   loading,
+  currentUserBackendRole,
   onEditPerson,
   pagination,
   onDeletePerson,
@@ -109,9 +117,13 @@ export function PeopleTable({
               people.map((p) => {
                 const isSelf = false; // later: p.id === userId
 
+                // Only SuperAdmin can edit/delete/disable Admin users; Admin cannot manage other Admins.
                 const canEditTarget =
                   !isSelf &&
-                  ((effectiveRole === "admin" && p.role !== "admin") ||
+                  (currentUserBackendRole === "SuperAdmin" ||
+                    (effectiveRole === "admin" &&
+                      currentUserBackendRole === "Admin" &&
+                      p.role !== "admin") ||
                     (effectiveRole === "manager" && p.role === "staff"));
 
                 return (

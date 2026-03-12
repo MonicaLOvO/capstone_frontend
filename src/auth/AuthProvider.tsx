@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { UserRole } from "@/types/roles";
 import { clearSession } from "@/auth/session";
 
+/** Backend role name – used to enforce "only SuperAdmin can manage Admin users" */
+export type BackendRoleName = "SuperAdmin" | "Admin" | "Manager" | "Staff";
+
 /**
  * Frontend User model
  * Represents the authenticated user stored in React context
@@ -13,6 +16,8 @@ type User = {
   id: string;
   name: string;
   role: UserRole;
+  /** Backend role name from JWT – use for rules like "Admin cannot edit other Admins" */
+  backendRoleName: BackendRoleName;
 };
 /**
  * Authentication context interface
@@ -25,6 +30,8 @@ type AuthContextType = {
   logout: () => void;
   /** Current user role (convenience so components can use const { role } = useAuth()) */
   role: UserRole | undefined;
+  /** Backend role name – e.g. "SuperAdmin" vs "Admin" for permission rules */
+  backendRoleName: BackendRoleName | undefined;
 };
 
 
@@ -66,10 +73,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       else if (rawRole === "manager") role = "manager";
       else if (rawRole === "staff") role = "staff";
 
+      const backendRoleName: BackendRoleName =
+        rawRole === "superadmin"
+          ? "SuperAdmin"
+          : rawRole === "admin"
+            ? "Admin"
+            : rawRole === "manager"
+              ? "Manager"
+              : "Staff";
+
       return {
         id: payload.userId ?? payload.sub ?? payload.UserId ?? "",
         name: String(rawName).trim() || "User",
         role,
+        backendRoleName,
       };
     } catch (err) {
       console.error("Invalid JWT token", err);
@@ -145,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         role: user?.role,
+        backendRoleName: user?.backendRoleName,
       }}
     >
       {children}

@@ -242,6 +242,7 @@ export default function ProfilePage() {
 
     try {
       await uploadProfileMedia(file);
+      window.dispatchEvent(new CustomEvent("profile-media-updated"));
     } catch {}
   }
 

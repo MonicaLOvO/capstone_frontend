@@ -29,7 +29,7 @@ export default function ReportsPage() {
                 Inventory Report
               </h2>
               <p className="text-blue-500 mt-2 leading-relaxed">
-                Monitor stock levels and inventory details.
+                Report warehouse stock that has been lost, damaged, expired, or stolen.
               </p>
             </div>
           </Link>
@@ -44,7 +44,7 @@ export default function ReportsPage() {
                 Injury Report
               </h2>
               <p className="text-blue-500 mt-2 leading-relaxed">
-                Record and review workplace injury documentation.
+                Document a workplace injury or incident involving an employee.
               </p>
             </div>
           </Link>
@@ -58,23 +58,13 @@ export default function ReportsPage() {
                 Employee Reports
               </h2>
               <p className="text-blue-500 mt-2 leading-relaxed">
-                Access employee performance and activity reports.
+                Report an employee for conduct, performance, attendance, or safety violations.
               </p>
             </div>
           </Link>
 
           <br></br>
 
-          <Link href="/reports/user">
-            <div className="group border-l-4 border-blue-600 pl-6 py-4 hover:bg-blue-50 rounded-lg transition cursor-pointer">
-              <h2 className="text-2xl font-semibold text-blue-700 group-hover:underline">
-                User Reports
-              </h2>
-              <p className="text-blue-500 mt-2 leading-relaxed">
-                View registered users and account-related data.
-              </p>
-            </div>
-          </Link>
 
         </div>
 

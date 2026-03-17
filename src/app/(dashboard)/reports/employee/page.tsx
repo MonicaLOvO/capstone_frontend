@@ -1,8 +1,17 @@
 "use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React, { useState } from "react";
+import {
+  Box, Typography, Input, Textarea, Button, Select, Option,
+  Sheet, Breadcrumbs, Link, Divider,
+  Modal, ModalDialog, ModalClose, Stack,
+} from "@mui/joy";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import AssignmentIndRoundedIcon from "@mui/icons-material/AssignmentIndRounded";
 
+// ── Enum matching your backend EmployeeReportTypeEnum ──
 enum EmployeeReportTypeEnum {
   Performance = "Performance",
   Conduct = "Conduct",
@@ -12,211 +21,322 @@ enum EmployeeReportTypeEnum {
   Other = "Other",
 }
 
-const EmployeeReportPage = () => {
-  const [showModal, setShowModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeUser] = useState("John"); 
+// ── The logged-in user's name (swap this with your auth hook) ──
+const CURRENT_USER = "John";
 
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    employeeName: '',
-    department: '',
-    reportType: '' as EmployeeReportTypeEnum,
-    reportDate: new Date().toISOString().split('T')[0],
-    description: '',
-    previousWarnings: '',
-    additionalNotes: '',
-    actionTaken: ''
-  });
+// ── Today's date formatted as YYYY-MM-DD ──
+const TODAY = new Date().toISOString().split("T")[0];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.reportType) return;
-    setIsSubmitting(true);
+// ── Empty form template (used on load and after reset) ──
+const emptyForm = {
+  employeeId: "",
+  employeeName: "",
+  department: "",           // optional
+  reportType: "" as EmployeeReportTypeEnum | "",
+  reportDate: TODAY,        // fixed to today
+  reportedBy: CURRENT_USER, // always auto-filled
+  description: "",
+  previousWarnings: "",     // optional
+  actionTaken: "",          // optional
+  additionalNotes: "",      // optional
+};
+
+export default function EmployeeReportPage() {
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+
+  // ── Update a single field in the form ──
+  const update = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // ── Check required fields before submitting ──
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.employeeId.trim())   newErrors.employeeId   = "Employee ID is required.";
+    if (!form.employeeName.trim()) newErrors.employeeName = "Employee name is required.";
+    if (!form.reportType)          newErrors.reportType   = "Please select a report type.";
+    if (!form.description.trim())  newErrors.description  = "Incident description is required.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0; // true = no errors
+  };
+
+  // ── Submit the form ──
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    setSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:3001/employee-reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("http://localhost:3001/employee-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
-          reportedBy: activeUser,
-          department: formData.department || null,
-          previousWarnings: formData.previousWarnings || null,
-          additionalNotes: formData.additionalNotes || null,
-          actionTaken: formData.actionTaken || null,
+          ...form,
+          department:       form.department       || null,
+          previousWarnings: form.previousWarnings || null,
+          actionTaken:      form.actionTaken       || null,
+          additionalNotes:  form.additionalNotes   || null,
         }),
       });
 
-      if (response.ok) setShowModal(true);
+      if (response.ok) setSuccessOpen(true);
       else alert("Submission failed. Check backend logs.");
-    } catch (error) {
+    } catch {
       alert("Connection Error: Is the backend running on port 3001?");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
+  // ── Reset every field back to empty ──
   const handleReset = () => {
-    setFormData({
-      employeeId: '', employeeName: '', department: '',
-      reportType: '' as EmployeeReportTypeEnum,
-      reportDate: new Date().toISOString().split('T')[0],
-      description: '', previousWarnings: '', additionalNotes: '', actionTaken: ''
-    });
-    setShowModal(false);
+    setForm(emptyForm);
+    setErrors({});
   };
 
-  // Common class for all inputs and textareas to make them bigger & uniform
-  const inputClass = "w-full bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] p-16 focus:ring-[12px] focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none transition-all text-3xl font-bold shadow-sm";
-
-  const textareaClass = "w-full bg-slate-50 border-2 border-slate-100 rounded-[3rem] p-16 focus:ring-[12px] focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none transition-all text-3xl font-medium leading-relaxed shadow-sm";
+  // ── "Create Another" button inside the success modal ──
+  const handleCreateAnother = () => {
+    handleReset();
+    setSuccessOpen(false);
+  };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-60">
-      {/* Breadcrumbs */}
-      <header className="bg-white border-b border-slate-200 px-12 py-8 mb-24 shadow-sm">
-        <nav className="text-xs font-black text-slate-400 flex items-center gap-6 uppercase tracking-[0.3em]">
-          <Link href="/" className="hover:text-blue-600 transition-colors">Home</Link>
-          <span className="text-slate-300 font-light text-xl">/</span>
-          <Link href="/reports" className="hover:text-blue-600 transition-colors">Reports</Link>
-          <span className="text-slate-300 font-light text-xl">/</span>
-          <span className="text-blue-600">Employee Report</span>
-        </nav>
-      </header>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.body", px: { xs: 2, sm: 4, md: 6 }, py: { xs: 3, md: 4 } }}>
 
-      <main className="max-w-6xl mx-auto px-10">
-        <div className="mb-32 text-center">
-          <h1 className="text-8xl font-black text-slate-900 tracking-tighter mb-10 uppercase italic">Employee Report</h1>
-          <div className="h-3 w-48 bg-blue-600 mx-auto rounded-full mb-10 shadow-[0_0_20px_rgba(37,99,235,0.4)]"></div>
-        </div>
+      {/* ── Breadcrumb: Home > Reports > Employee Report ── */}
+      <Breadcrumbs size="sm" separator={<ChevronRightRoundedIcon fontSize="small" />} sx={{ mb: 2, pl: 0 }}>
+        <Link underline="none" color="neutral" href="/dashboard" aria-label="Home" sx={{ display: "flex", alignItems: "center" }}>
+          <HomeRoundedIcon fontSize="small" />
+        </Link>
+        <Link underline="hover" color="neutral" href="/reports" sx={{ fontSize: "sm", fontWeight: 500 }}>
+          Reports
+        </Link>
+        <Typography color="primary" fontWeight={500} fontSize="sm">
+          Employee Report
+        </Typography>
+      </Breadcrumbs>
 
-        <div className="bg-white rounded-[5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.08)] border border-slate-100 p-24">
-          <form onSubmit={handleSubmit} className="space-y-24">
+      {/* ── Page Title ── */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 4 }}>
+        <AssignmentIndRoundedIcon sx={{ fontSize: 32, color: "primary.500" }} />
+        <Box>
+          <Typography level="h2" fontWeight={600}>Employee Report</Typography>
+          <Typography level="body-sm" textColor="text.tertiary">
+            Submit a new employee incident or conduct report
+          </Typography>
+        </Box>
+      </Box>
 
-            {/* Employee ID */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-[0.25em]">Employee ID *</label>
-              <input
-                type="text" required placeholder="EMP-001"
-                className={inputClass}
-                value={formData.employeeId}
-                onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
-              />
-            </div>
-            
+      {/* ── Main Form Card ── */}
+      <Sheet variant="outlined" sx={{ maxWidth: 780, borderRadius: "lg", p: { xs: 3, md: 4 }, boxShadow: "sm" }}>
+        <Typography level="title-md" fontWeight={600} mb={0.5}>Report Details</Typography>
+        <Typography level="body-sm" textColor="text.tertiary" mb={3}>
+          All fields are required unless marked optional.
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
 
-            {/* Full Name */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-[0.25em]">Full Name *</label>
-              <input
-                type="text" required placeholder="Enter full name"
-                className={inputClass}
-                value={formData.employeeName}
-                onChange={(e) => setFormData({...formData, employeeName: e.target.value})}
-              />
-            </div>
-            
+        <Stack spacing={3}>
 
-            {/* Department */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-[0.25em]">Department</label>
-              <input
-                type="text" placeholder="Enter department"
-                className={inputClass}
-                value={formData.department}
-                onChange={(e) => setFormData({...formData, department: e.target.value})}
-              />
-            </div>
+          {/* Employee ID */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Employee ID <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Input
+              size="lg"
+              placeholder="e.g. EMP-001"
+              value={form.employeeId}
+              onChange={(e) => update("employeeId", e.target.value)}
+              error={!!errors.employeeId}
+              sx={{ width: "100%" }}
+            />
+            {errors.employeeId && <Typography level="body-xs" color="danger" mt={0.5}>{errors.employeeId}</Typography>}
+          </Box>
 
-            {/* Report Type */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-[0.25em]">Report Type *</label>
-              <select
-                required
-                className={`${inputClass} appearance-none cursor-pointer`}
-                value={formData.reportType}
-                onChange={(e) => setFormData({...formData, reportType: e.target.value as EmployeeReportTypeEnum})}
-              >
-                <option value="" disabled hidden>Select Category</option>
-                {Object.values(EmployeeReportTypeEnum).map(t => <option key={t} value={t} className="text-slate-900">{t}</option>)}
-              </select>
-            </div>
+          {/* Employee Full Name */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Full Name <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Input
+              size="lg"
+              placeholder="Full name of the employee being reported"
+              value={form.employeeName}
+              onChange={(e) => update("employeeName", e.target.value)}
+              error={!!errors.employeeName}
+              sx={{ width: "100%" }}
+            />
+            {errors.employeeName && <Typography level="body-xs" color="danger" mt={0.5}>{errors.employeeName}</Typography>}
+          </Box>
 
-            {/* Report Date */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-[0.25em]">Date *</label>
-              <input
-                type="date" required
-                className={inputClass}
-                value={formData.reportDate}
-                onChange={(e) => setFormData({...formData, reportDate: e.target.value})}
-              />
-            </div>
+          {/* Department — optional */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Department <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+            </Typography>
+            <Input
+              size="lg"
+              placeholder="e.g. Warehouse, Logistics, HR"
+              value={form.department}
+              onChange={(e) => update("department", e.target.value)}
+              sx={{ width: "100%" }}
+            />
+          </Box>
 
-            {/* Incident Description */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-[0.25em]">Incident Description *</label>
-              <textarea
-                required rows={10}
-                placeholder="Describe the incident in detail..."
-                className={textareaClass}
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-              />
-            </div>
+          {/* Reported By — read-only, auto-filled */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>Reported By</Typography>
+            <Input
+              size="lg"
+              value={form.reportedBy}
+              readOnly
+              endDecorator={<Typography level="body-xs" textColor="text.tertiary">Auto-filled</Typography>}
+              sx={{ width: "100%", bgcolor: "background.level1", cursor: "not-allowed", "& input": { cursor: "not-allowed" } }}
+            />
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>
+              Automatically set to your account name.
+            </Typography>
+          </Box>
 
-            {/* Warnings */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-400 uppercase tracking-[0.25em] italic underline underline-offset-8 decoration-slate-200">Warnings (Optional)</label>
-              <textarea
-                rows={6} placeholder="List previous warnings..."
-                className={textareaClass}
-                value={formData.previousWarnings}
-                onChange={(e) => setFormData({...formData, previousWarnings: e.target.value})}
-              />
-            </div>
+          {/* Report Date — read-only, fixed to today */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>Report Date</Typography>
+            <Input
+              size="lg"
+              value={form.reportDate}
+              readOnly
+              endDecorator={<Typography level="body-xs" textColor="text.tertiary">Auto-filled</Typography>}
+              sx={{ width: "100%", maxWidth: 320, bgcolor: "background.level1", cursor: "not-allowed", "& input": { cursor: "not-allowed" } }}
+            />
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>
+              Automatically set to today's date.
+            </Typography>
+          </Box>
 
-            {/* Action Taken */}
-            <div className="flex flex-col gap-10">
-              <label className="text-sm font-black text-slate-400 uppercase tracking-[0.25em] italic underline underline-offset-8 decoration-slate-200">Action Taken (Optional)</label>
-              <textarea
-                rows={6} placeholder="List disciplinary actions..."
-                className={textareaClass}
-                value={formData.actionTaken}
-                onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
-              />
-            </div>
+          {/* Report Type — dropdown */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Report Type <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Select
+              placeholder="Select a report type…"
+              value={form.reportType || null}
+              onChange={(_, val) => update("reportType", val as string)}
+              size="lg"
+              color={errors.reportType ? "danger" : "neutral"}
+              sx={{ width: "100%" }}
+            >
+              {Object.values(EmployeeReportTypeEnum).map((type) => (
+                <Option key={type} value={type}>{type}</Option>
+              ))}
+            </Select>
+            {errors.reportType && <Typography level="body-xs" color="danger" mt={0.5}>{errors.reportType}</Typography>}
+          </Box>
 
-            {/* Submit Button */}
-            <div className="pt-20">
-              <button
-                type="submit" disabled={isSubmitting}
-                className="w-full bg-gradient-to-br from-[#0047AB] via-[#1E3A8A] to-[#111827] text-white font-black py-12 rounded-[4rem] shadow-[0_30px_70px_-15px_rgba(30,58,138,0.5)] hover:shadow-[0_40px_80px_-10px_rgba(30,58,138,0.6)] active:scale-[0.97] transition-all text-4xl uppercase tracking-[0.5em]"
-              >
-                {isSubmitting ? "Processing..." : "Submit Report"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </main>
+          {/* Incident Description */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Incident Description <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Textarea
+              placeholder="Describe the incident in detail…"
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
+              minRows={4}
+              maxRows={12}
+              error={!!errors.description}
+              sx={{ width: "100%", resize: "vertical" }}
+            />
+            {errors.description && <Typography level="body-xs" color="danger" mt={0.5}>{errors.description}</Typography>}
+          </Box>
 
-      {/* Success Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-3xl flex items-center justify-center z-50 p-10">
-          <div className="bg-white p-24 rounded-[6rem] shadow-2xl max-w-3xl w-full text-center border border-white/20">
-            <div className="w-48 h-48 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-14 text-8xl shadow-inner border border-green-100 italic font-black">!</div>
-            <h2 className="text-6xl font-black text-slate-900 mb-8 tracking-tighter uppercase">Entry Recorded</h2>
-            <p className="text-slate-500 mb-20 text-3xl leading-relaxed font-medium">Employee Record for <span className="text-blue-600 font-bold">{formData.employeeName}</span> has been securely logged.</p>
-            <div className="flex flex-col gap-10">
-              <button onClick={handleReset} className="w-full py-10 bg-[#0047AB] text-white rounded-[2.5rem] hover:bg-blue-800 font-black transition-all shadow-2xl text-2xl uppercase tracking-widest">Create New Entry</button>
-              <Link href="/" className="w-full py-10 bg-slate-100 text-slate-600 rounded-[2.5rem] hover:bg-slate-200 font-black transition-all text-2xl uppercase tracking-widest block text-center">Exit to Dashboard</Link>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+          {/* Previous Warnings — optional */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Previous Warnings <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+            </Typography>
+            <Textarea
+              placeholder="List any previous warnings issued to this employee…"
+              value={form.previousWarnings}
+              onChange={(e) => update("previousWarnings", e.target.value)}
+              minRows={3}
+              maxRows={8}
+              sx={{ width: "100%", resize: "vertical" }}
+            />
+          </Box>
+
+          {/* Action Taken — optional */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Action Taken <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+            </Typography>
+            <Textarea
+              placeholder="Describe any disciplinary actions taken…"
+              value={form.actionTaken}
+              onChange={(e) => update("actionTaken", e.target.value)}
+              minRows={3}
+              maxRows={8}
+              sx={{ width: "100%", resize: "vertical" }}
+            />
+          </Box>
+
+          {/* Additional Notes — optional */}
+          <Box>
+            <Typography level="title-sm" fontWeight={500} mb={0.75}>
+              Additional Notes <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+            </Typography>
+            <Textarea
+              placeholder="Any extra context or follow-up details…"
+              value={form.additionalNotes}
+              onChange={(e) => update("additionalNotes", e.target.value)}
+              minRows={3}
+              maxRows={10}
+              sx={{ width: "100%", resize: "vertical" }}
+            />
+          </Box>
+
+          {/* Submit + Clear buttons */}
+          <Box sx={{ display: "flex", gap: 2, pt: 1 }}>
+            <Button size="lg" onClick={handleSubmit} loading={submitting} sx={{ flex: 1 }}>
+              Submit Report
+            </Button>
+            <Button size="lg" variant="outlined" color="neutral" onClick={handleReset} disabled={submitting}>
+              Clear
+            </Button>
+          </Box>
+
+        </Stack>
+      </Sheet>
+
+      {/* ── Success Modal ── */}
+      <Modal open={successOpen} onClose={() => setSuccessOpen(false)}>
+        <ModalDialog variant="outlined" size="md" sx={{ maxWidth: 420, textAlign: "center", borderRadius: "lg" }}>
+          <ModalClose />
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, py: 1 }}>
+            <CheckCircleOutlineRoundedIcon sx={{ fontSize: 56, color: "success.500" }} />
+            <Typography level="h3" fontWeight={600}>Report Submitted!</Typography>
+            <Typography level="body-md" textColor="text.secondary">
+              Employee record for{" "}
+              <Typography component="span" fontWeight={600} textColor="primary.500">
+                {form.employeeName}
+              </Typography>{" "}
+              has been successfully created and logged in the system.
+            </Typography>
+            <Divider sx={{ width: "100%" }} />
+            <Stack spacing={1.5} sx={{ width: "100%" }}>
+              <Button size="lg" fullWidth onClick={handleCreateAnother}>
+                Create Another Report
+              </Button>
+              <Button size="lg" variant="outlined" color="neutral" fullWidth component="a" href="/dashboard">
+                Go Back to Dashboard
+              </Button>
+            </Stack>
+          </Box>
+        </ModalDialog>
+      </Modal>
+
+    </Box>
   );
-};
-
-export default EmployeeReportPage;
+}

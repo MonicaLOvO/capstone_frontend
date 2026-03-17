@@ -1,226 +1,365 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
+import {
+  Box,
+  Typography,
+  Input,
+  Textarea,
+  Select,
+  Option,
+  Button,
+  Sheet,
+  Breadcrumbs,
+  Link,
+  Divider,
+  Modal,
+  ModalDialog,
+  ModalClose,
+  Stack,
+} from "@mui/joy";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 
+// ────────────────────────────────────────────────
+// Enum matching backend InventoryReportType
+// ────────────────────────────────────────────────
 enum InventoryReportType {
-  Lost = "Lost",
+  Lost = "lost",
   Damaged = "Damaged",
   Expired = "Expired",
-  Stolen = "Stolen",
+  Stolen = "stolen",
 }
 
-const InventoryReportPage = () => {
-  const [showModal, setShowModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeUser] = useState("John");
+const reportTypeLabels: Record<InventoryReportType, string> = {
+  [InventoryReportType.Lost]: "Lost",
+  [InventoryReportType.Damaged]: "Damaged",
+  [InventoryReportType.Expired]: "Expired",
+  [InventoryReportType.Stolen]: "Stolen",
+};
 
-  const [formData, setFormData] = useState({
-    itemName: "",
-    reportType: "" as InventoryReportType,
-    description: "",
-    additionalNotes: "",
+// ────────────────────────────────────────────────
+// Form state type (mirrors InventoryReportsItem entity)
+// ────────────────────────────────────────────────
+interface InventoryReportForm {
+  ItemName: string;
+  reportedBy: string; // auto-populated
+  ReportType: InventoryReportType | "";
+  Description: string;
+  AdditionalNotes: string;
+}
+
+// ────────────────────────────────────────────────
+// Simulated logged-in user (replace with auth hook)
+// ────────────────────────────────────────────────
+const CURRENT_USER = "John Smith"; // Replace: const { user } = useAuth();
+
+export default function InventoryReportPage() {
+  const [form, setForm] = useState<InventoryReportForm>({
+    ItemName: "",
+    reportedBy: CURRENT_USER,
+    ReportType: "",
+    Description: "",
+    AdditionalNotes: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.reportType) return;
+  const [errors, setErrors] = useState<Partial<Record<keyof InventoryReportForm, string>>>({});
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-    setIsSubmitting(true);
-
-    try {
-      const token = localStorage.getItem("token");
-
-      const response = await fetch("http://localhost:4000/api/inventory", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ProductName: formData.itemName,
-          Description: `${formData.description} ${formData.additionalNotes}`,
-          Quantity: 1,
-          UnitPrice: 0,
-          Category: formData.reportType,
-          Location: "Unknown",
-          Sku: "REPORT-" + Date.now(),
-          Status: 2,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.Success) {
-        setShowModal(true);
-
-        setFormData({
-          itemName: "",
-          reportType: "" as InventoryReportType,
-          description: "",
-          additionalNotes: "",
-        });
-      } else {
-        alert(result.Message || "Failed to submit report");
-      }
-    } catch (error) {
-      console.error("Connection Error:", error);
-      alert("Could not connect to the backend server.");
-    } finally {
-      setIsSubmitting(false);
-    }
+  // ── Validation ──────────────────────────────
+  const validate = (): boolean => {
+    const newErrors: typeof errors = {};
+    if (!form.ItemName.trim()) newErrors.ItemName = "Item name is required.";
+    if (!form.ReportType) newErrors.ReportType = "Please select a report type.";
+    if (!form.Description.trim()) newErrors.Description = "Description is required.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleReset = () => {
-    setShowModal(false);
+  // ── Submit ───────────────────────────────────
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    setSubmitting(true);
+
+    // TODO: replace with real API call
+    // await fetch("/api/inventory-reports", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify(form),
+    // });
+
+    await new Promise((r) => setTimeout(r, 600)); // simulate network
+    setSubmitting(false);
+    setSuccessOpen(true);
+  };
+
+  // ── Reset form ───────────────────────────────
+  const resetForm = () => {
+    setForm({
+      ItemName: "",
+      reportedBy: CURRENT_USER,
+      ReportType: "",
+      Description: "",
+      AdditionalNotes: "",
+    });
+    setErrors({});
+  };
+
+  const handleCreateAnother = () => {
+    resetForm();
+    setSuccessOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-40">
-      <header className="bg-white border-b border-slate-200 px-12 py-7 mb-20 shadow-sm">
-        <nav className="text-[11px] font-black text-slate-400 flex items-center gap-4 uppercase tracking-[0.25em]">
-          <Link href="/" className="hover:text-blue-600 transition-colors">
-            Home
-          </Link>
-          <span className="text-slate-300 font-light">{">"}</span>
-          <Link
-            href="/reports"
-            className="hover:text-blue-600 transition-colors"
-          >
-            Reports
-          </Link>
-          <span className="text-slate-300 font-light">{">"}</span>
-          <span className="text-blue-600">Inventory Report</span>
-        </nav>
-      </header>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "background.body",
+        px: { xs: 2, sm: 4, md: 6 },
+        py: { xs: 3, md: 4 },
+      }}
+    >
+      {/* ── Breadcrumb ─────────────────────────── */}
+      <Breadcrumbs
+        size="sm"
+        aria-label="breadcrumbs"
+        separator={<ChevronRightRoundedIcon fontSize="small" />}
+        sx={{ mb: 2, pl: 0 }}
+      >
+        <Link
+          underline="none"
+          color="neutral"
+          href="/dashboard"
+          aria-label="Home"
+          sx={{ display: "flex", alignItems: "center" }}
+        >
+          <HomeRoundedIcon fontSize="small" />
+        </Link>
+        <Link
+          underline="hover"
+          color="neutral"
+          href="/reports"
+          sx={{ fontSize: "sm", fontWeight: 500 }}
+        >
+          Reports
+        </Link>
+        <Typography color="primary" fontWeight={500} fontSize="sm">
+          Inventory Reports
+        </Typography>
+      </Breadcrumbs>
 
-      <main className="max-w-5xl mx-auto px-8">
-        <div className="mb-24 text-center">
-          <h1 className="text-7xl font-black text-slate-900 tracking-tighter mb-8 uppercase">
-            Inventory Report
-          </h1>
-          <div className="h-2 w-32 bg-blue-600 mx-auto rounded-full mb-8"></div>
-        </div>
+      {/* ── Page heading ────────────────────────── */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 4 }}>
+        <AssessmentRoundedIcon sx={{ fontSize: 32, color: "primary.500" }} />
+        <Box>
+          <Typography level="h2" fontWeight={600}>
+            Inventory Reports
+          </Typography>
+          <Typography level="body-sm" textColor="text.tertiary">
+            Submit a new inventory discrepancy report
+          </Typography>
+        </Box>
+      </Box>
 
-        <div className="bg-white rounded-[4rem] shadow-2xl shadow-slate-200/50 border border-slate-100 p-20">
-          <form onSubmit={handleSubmit} className="space-y-20">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-20">
-              <div className="flex flex-col gap-8">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
-                  Item Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl p-7 focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none transition-all text-2xl font-medium"
-                  value={formData.itemName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, itemName: e.target.value })
-                  }
-                />
-              </div>
+      {/* ── Form card ───────────────────────────── */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          maxWidth: 780,
+          borderRadius: "lg",
+          p: { xs: 3, md: 4 },
+          boxShadow: "sm",
+        }}
+      >
+        <Typography level="title-md" fontWeight={600} mb={0.5}>
+          Report Details
+        </Typography>
+        <Typography level="body-sm" textColor="text.tertiary" mb={3}>
+          All fields are required unless marked optional.
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
 
-              <div className="flex flex-col gap-8">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
-                  Reported By
-                </label>
-                <div className="w-full bg-slate-100 border-2 border-slate-100 rounded-3xl p-7 text-slate-400 font-mono text-xl flex items-center shadow-inner">
-                  <span className="mr-5 text-blue-500 text-sm">👤</span>{" "}
-                  {activeUser}
-                </div>
-              </div>
-            </div>
+        <Stack spacing={3}>
+          {/* Item Name */}
+          <Box>
+            <Typography level="title-sm" mb={0.75} fontWeight={500}>
+              Item Name <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Input
+              placeholder="e.g. Barcode Scanner Model X200"
+              value={form.ItemName}
+              onChange={(e) => setForm({ ...form, ItemName: e.target.value })}
+              error={!!errors.ItemName}
+              size="lg"
+              sx={{ width: "100%" }}
+            />
+            {errors.ItemName && (
+              <Typography level="body-xs" color="danger" mt={0.5}>
+                {errors.ItemName}
+              </Typography>
+            )}
+          </Box>
 
-            <div className="flex flex-col gap-8">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
-                Report Type *
-              </label>
-              <select
-                required
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl p-7 focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none text-2xl font-medium"
-                value={formData.reportType}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    reportType: e.target.value as InventoryReportType,
-                  })
-                }
-              >
-                <option value="" disabled>
-                  Select Category...
-                </option>
-                {Object.values(InventoryReportType).map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Reported By (auto-populated, read-only) */}
+          <Box>
+            <Typography level="title-sm" mb={0.75} fontWeight={500}>
+              Reported By
+            </Typography>
+            <Input
+              value={form.reportedBy}
+              readOnly
+              size="lg"
+              sx={{
+                width: "100%",
+                bgcolor: "background.level1",
+                cursor: "not-allowed",
+                "& input": { cursor: "not-allowed" },
+              }}
+              endDecorator={
+                <Typography level="body-xs" textColor="text.tertiary">
+                  Auto-filled
+                </Typography>
+              }
+            />
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>
+              Automatically set to your account name.
+            </Typography>
+          </Box>
 
-            <div className="flex flex-col gap-8">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
-                Detailed Description *
-              </label>
-              <textarea
-                required
-                rows={7}
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl p-7 focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none transition-all text-2xl font-medium"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="flex flex-col gap-8">
-              <label className="text-xs font-black text-slate-300 uppercase tracking-[0.2em] ml-2">
-                Additional Notes
-              </label>
-              <textarea
-                rows={4}
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl p-7 focus:ring-8 focus:ring-blue-500/5 focus:border-blue-400 focus:bg-white outline-none transition-all text-2xl font-medium"
-                value={formData.additionalNotes}
-                onChange={(e) =>
-                  setFormData({ ...formData, additionalNotes: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="pt-16">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-gradient-to-r from-[#0047AB] to-[#1E3A8A] text-white font-black py-10 rounded-[3rem] shadow-lg transition-all text-3xl uppercase tracking-[0.4em]"
-              >
-                {isSubmitting ? "Submitting..." : "Submit Report"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </main>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-3xl flex items-center justify-center z-50 p-6">
-          <div className="bg-white p-20 rounded-[5rem] shadow-2xl max-w-2xl w-full text-center">
-            <div className="text-6xl text-green-500 mb-10">✓</div>
-            <h2 className="text-4xl font-black mb-6 uppercase">
-              Report Submitted
-            </h2>
-            <p className="text-slate-500 mb-10 text-xl">
-              Submitted by <span className="text-blue-600">{activeUser}</span>
-            </p>
-
-            <button
-              onClick={handleReset}
-              className="w-full py-6 bg-blue-700 text-white rounded-2xl font-bold"
+          {/* Report Type */}
+          <Box>
+            <Typography level="title-sm" mb={0.75} fontWeight={500}>
+              Report Type <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Select
+              placeholder="Select a report type…"
+              value={form.ReportType || null}
+              onChange={(_, val) =>
+                setForm({ ...form, ReportType: val as InventoryReportType })
+              }
+              size="lg"
+              color={errors.ReportType ? "danger" : "neutral"}
+              sx={{ width: "100%" }}
             >
-              Create Another Report
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+              {Object.values(InventoryReportType).map((type) => (
+                <Option key={type} value={type}>
+                  {reportTypeLabels[type]}
+                </Option>
+              ))}
+            </Select>
+            {errors.ReportType && (
+              <Typography level="body-xs" color="danger" mt={0.5}>
+                {errors.ReportType}
+              </Typography>
+            )}
+          </Box>
 
-export default InventoryReportPage;
+          {/* Description */}
+          <Box>
+            <Typography level="title-sm" mb={0.75} fontWeight={500}>
+              Description <Typography component="span" color="danger">*</Typography>
+            </Typography>
+            <Textarea
+              placeholder="Provide a clear description of the issue…"
+              value={form.Description}
+              onChange={(e) => setForm({ ...form, Description: e.target.value })}
+              minRows={4}
+              maxRows={12}
+              error={!!errors.Description}
+              sx={{ width: "100%", resize: "vertical" }}
+            />
+            {errors.Description && (
+              <Typography level="body-xs" color="danger" mt={0.5}>
+                {errors.Description}
+              </Typography>
+            )}
+          </Box>
+
+          {/* Additional Notes (optional) */}
+          <Box>
+            <Typography level="title-sm" mb={0.75} fontWeight={500}>
+              Additional Notes{" "}
+              <Typography component="span" level="body-xs" textColor="text.tertiary">
+                (optional)
+              </Typography>
+            </Typography>
+            <Textarea
+              placeholder="Any extra context, reference numbers, or follow-up actions…"
+              value={form.AdditionalNotes}
+              onChange={(e) => setForm({ ...form, AdditionalNotes: e.target.value })}
+              minRows={3}
+              maxRows={10}
+              sx={{ width: "100%", resize: "vertical" }}
+            />
+          </Box>
+
+          {/* Actions */}
+          <Box sx={{ display: "flex", gap: 2, pt: 1 }}>
+            <Button
+              size="lg"
+              onClick={handleSubmit}
+              loading={submitting}
+              sx={{ flex: 1 }}
+            >
+              Submit Report
+            </Button>
+            <Button
+              size="lg"
+              variant="outlined"
+              color="neutral"
+              onClick={resetForm}
+              disabled={submitting}
+            >
+              Clear
+            </Button>
+          </Box>
+        </Stack>
+      </Sheet>
+
+      {/* ── Success Modal ────────────────────────── */}
+      <Modal open={successOpen} onClose={() => setSuccessOpen(false)}>
+        <ModalDialog
+          variant="outlined"
+          size="md"
+          sx={{ maxWidth: 420, textAlign: "center", borderRadius: "lg" }}
+        >
+          <ModalClose />
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, py: 1 }}>
+            <CheckCircleOutlineRoundedIcon
+              sx={{ fontSize: 56, color: "success.500" }}
+            />
+            <Typography level="h3" fontWeight={600}>
+              Report Submitted!
+            </Typography>
+            <Typography level="body-md" textColor="text.secondary">
+              Your inventory report has been successfully created and logged in the system.
+            </Typography>
+            <Divider sx={{ width: "100%" }} />
+            <Stack spacing={1.5} sx={{ width: "100%" }}>
+              <Button
+                size="lg"
+                fullWidth
+                onClick={handleCreateAnother}
+              >
+                Create Another Report
+              </Button>
+              <Button
+                size="lg"
+                variant="outlined"
+                color="neutral"
+                fullWidth
+                component="a"
+                href="/dashboard"
+              >
+                Go Back to Dashboard
+              </Button>
+            </Stack>
+          </Box>
+        </ModalDialog>
+      </Modal>
+    </Box>
+  );
+}

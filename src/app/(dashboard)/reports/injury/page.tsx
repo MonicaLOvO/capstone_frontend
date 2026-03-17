@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box, Typography, Input, Textarea, Button,
   Sheet, Breadcrumbs, Link, Divider,
@@ -11,29 +11,81 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import MedicalServicesRoundedIcon from "@mui/icons-material/MedicalServicesRounded";
 
-// ── The logged-in user's name  ──
-const CURRENT_USER = "John Smith";
+
+// TODO: Update this once your teammate creates the injury-reports endpoint
+const API_ENDPOINT = "http://localhost:4000/api/injury-reports";
 
 // ── Today's date formatted as YYYY-MM-DD ──
 const TODAY = new Date().toISOString().split("T")[0];
 
-// ── Empty form template (used on load and after reset) ──
+// ── Empty form template ──
 const emptyForm = {
   EmployeeName: "",
-  ReportedBy: CURRENT_USER,  // always auto-filled
-  ReportDate: TODAY,          // always fixed to today
+  ReportedBy: "",       // auto-filled from logged-in user
+  ReportDate: TODAY,    // always fixed to today
   InjuryType: "",
   Location: "",
   Description: "",
-  Witnesses: "",              // optional
-  AdditionalNotes: "",        // optional
+  Witnesses: "",        // optional
+  AdditionalNotes: "",  // optional
 };
 
 export default function InjuryReportPage() {
+  const [currentUser, setCurrentUser] = useState("");
+  const [authToken, setAuthToken] = useState("");
+
+  // ── Auto-login on page load (same pattern as inventory page) ──
+  useEffect(() => {
+    const loginAndStoreToken = async () => {
+      try {
+        const res = await fetch("http://localhost:4000/api/user/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            Username: "SuperAdmin",
+            Password: "SuperAdmin",
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data?.Data?.token) {
+          localStorage.setItem("token", data.Data.token);
+          localStorage.setItem("user", JSON.stringify(data.Data.user));
+
+          setAuthToken(data.Data.token);
+
+          const user = data.Data.user;
+          const displayName =
+            user.FirstName && user.LastName
+              ? `${user.FirstName} ${user.LastName}`
+              : user.Username;
+
+          setCurrentUser(displayName);
+
+          console.log("✅ Auto login success");
+        } else {
+          console.error("❌ Login failed", data);
+        }
+      } catch (err) {
+        console.error("❌ Login error", err);
+      }
+    };
+
+    loginAndStoreToken();
+  }, []);
+
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
+
+  // ── Keep ReportedBy in sync once login loads the user ──
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, ReportedBy: currentUser }));
+  }, [currentUser]);
 
   // ── Update a single field in the form ──
   const update = (field: string, value: string) => {
@@ -45,32 +97,75 @@ export default function InjuryReportPage() {
     const newErrors: Record<string, string> = {};
     if (!form.EmployeeName.trim()) newErrors.EmployeeName = "Employee name is required.";
     if (!form.InjuryType.trim())   newErrors.InjuryType   = "Injury type is required.";
-    if (!form.Location.trim())     newErrors.Location      = "Location is required.";
-    if (!form.Description.trim())  newErrors.Description   = "Description is required.";
+    if (!form.Location.trim())     newErrors.Location     = "Location is required.";
+    if (!form.Description.trim())  newErrors.Description  = "Description is required.";
     setErrors(newErrors);
+    
     return Object.keys(newErrors).length === 0; // true = no errors
   };
 
-  // ── Submit the form ──
-  const handleSubmit = async () => {
-    if (!validate()) return;
-    setSubmitting(true);
+  // ── Submit the form to the backend ──
+ const handleSubmit = async () => {
+  if (!validate()) return;
 
-    // TODO: replace with your real API call, e.g.:
-    // await fetch("/api/injury-reports", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(form),
-    // });
+  const token = authToken || localStorage.getItem("token");
 
-    await new Promise((r) => setTimeout(r, 600)); // simulates network delay
+if (!token) {
+  alert("Not logged in. Please wait...");
+  return;
+}
+
+  setSubmitting(true);
+
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        EmployeeName:    form.EmployeeName,
+
+        // ✅ MATCH INVENTORY STYLE (SAFE BACKEND FORMAT)
+        Description: `
+Employee: ${form.EmployeeName}
+Reported By: ${form.ReportedBy}
+Date: ${form.ReportDate}
+Injury Type: ${form.InjuryType}
+Location: ${form.Location}
+
+${form.Description}
+
+Witnesses: ${form.Witnesses || "N/A"}
+Additional Notes: ${form.AdditionalNotes || "N/A"}
+        `,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.Success) {
+      setSuccessOpen(true);
+    } else if (response.status === 401) {
+      alert("Session expired. Please log in again.");
+    } else if (response.status === 403) {
+      alert("You do not have permission to submit injury reports.");
+    } else {
+      console.error(data);
+      alert("Submission failed. Check backend logs.");
+    }
+  } catch (error) {
+    console.error(error);
+    alert("Connection Error: Is the backend running on port 4000?");
+  } finally {
     setSubmitting(false);
-    setSuccessOpen(true);
-  };
+  }
+};
 
-  // ── Reset every field back to empty ──
+  // ── Reset every field back to empty (keeps ReportedBy from logged-in user) ──
   const handleReset = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm, ReportedBy: currentUser });
     setErrors({});
   };
 
@@ -79,6 +174,10 @@ export default function InjuryReportPage() {
     handleReset();
     setSuccessOpen(false);
   };
+
+  if (!authToken) {
+  return <Typography>Loading user session...</Typography>;
+}
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.body", px: { xs: 2, sm: 4, md: 6 }, py: { xs: 3, md: 4 } }}>
@@ -133,22 +232,23 @@ export default function InjuryReportPage() {
             {errors.EmployeeName && <Typography level="body-xs" color="danger" mt={0.5}>{errors.EmployeeName}</Typography>}
           </Box>
 
-          {/* Reported By — read-only, auto-filled */}
+          {/* Reported By — read-only, auto-filled from login */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>Reported By</Typography>
             <Input
               size="lg"
               value={form.ReportedBy}
               readOnly
+              placeholder={currentUser ? "" : "Loading..."}
               endDecorator={<Typography level="body-xs" textColor="text.tertiary">Auto-filled</Typography>}
               sx={{ width: "100%", bgcolor: "background.level1", cursor: "not-allowed", "& input": { cursor: "not-allowed" } }}
             />
             <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>
-              Automatically set to your account name.
+              Automatically set to your logged-in account name.
             </Typography>
           </Box>
 
-          {/* Report Date — read-only, always today */}
+          {/* Report Date — read-only, fixed to today */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>Report Date</Typography>
             <Input
@@ -244,9 +344,15 @@ export default function InjuryReportPage() {
 
           {/* Submit + Clear buttons */}
           <Box sx={{ display: "flex", gap: 2, pt: 1 }}>
-            <Button size="lg" onClick={handleSubmit} loading={submitting} sx={{ flex: 1 }}>
-              Submit Report
-            </Button>
+            <Button
+  size="lg"
+  onClick={handleSubmit}
+  loading={submitting}
+  disabled={!authToken}   // ✅ ADD THIS
+  sx={{ flex: 1 }}
+>
+  Submit Report
+</Button>
             <Button size="lg" variant="outlined" color="neutral" onClick={handleReset} disabled={submitting}>
               Clear
             </Button>

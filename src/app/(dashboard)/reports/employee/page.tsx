@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box, Typography, Input, Textarea, Button, Select, Option,
   Sheet, Breadcrumbs, Link, Divider,
@@ -21,20 +21,19 @@ enum EmployeeReportTypeEnum {
   Other = "Other",
 }
 
-// ── The logged-in user's name (swap this with your auth hook) ──
-const CURRENT_USER = "John";
+// ── Backend API base URL ──
+const API_ENDPOINT = "http://localhost:4000/api/employee-reports";
 
 // ── Today's date formatted as YYYY-MM-DD ──
 const TODAY = new Date().toISOString().split("T")[0];
 
 // ── Empty form template (used on load and after reset) ──
 const emptyForm = {
-  employeeId: "",
   employeeName: "",
   department: "",           // optional
   reportType: "" as EmployeeReportTypeEnum | "",
   reportDate: TODAY,        // fixed to today
-  reportedBy: CURRENT_USER, // always auto-filled
+  reportedBy: "",           // auto-filled from logged-in user
   description: "",
   previousWarnings: "",     // optional
   actionTaken: "",          // optional
@@ -42,10 +41,61 @@ const emptyForm = {
 };
 
 export default function EmployeeReportPage() {
+  // ── Pull the logged-in user and token (same pattern as inventory/injury pages) ──
+  const [currentUser, setCurrentUser] = useState("");
+  const [authToken, setAuthToken] = useState("");
+
+  useEffect(() => {
+    const loginAndStoreToken = async () => {
+      try {
+        const res = await fetch("http://localhost:4000/api/user/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            Username: "SuperAdmin",
+            Password: "SuperAdmin",
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data?.Data?.token) {
+          localStorage.setItem("token", data.Data.token);
+          localStorage.setItem("user", JSON.stringify(data.Data.user));
+
+          setAuthToken(data.Data.token);
+
+          const user = data.Data.user;
+          const displayName =
+            user.FirstName && user.LastName
+              ? `${user.FirstName} ${user.LastName}`
+              : user.Username;
+
+          setCurrentUser(displayName);
+
+          console.log("✅ Auto login success");
+        } else {
+          console.error("❌ Login failed", data);
+        }
+      } catch (err) {
+        console.error("❌ Login error", err);
+      }
+    };
+
+    loginAndStoreToken();
+  }, []);
+
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
+
+  // ── Keep reportedBy in sync once the user loads ──
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, reportedBy: currentUser }));
+  }, [currentUser]);
 
   // ── Update a single field in the form ──
   const update = (field: string, value: string) => {
@@ -55,44 +105,77 @@ export default function EmployeeReportPage() {
   // ── Check required fields before submitting ──
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!form.employeeId.trim())   newErrors.employeeId   = "Employee ID is required.";
     if (!form.employeeName.trim()) newErrors.employeeName = "Employee name is required.";
     if (!form.reportType)          newErrors.reportType   = "Please select a report type.";
     if (!form.description.trim())  newErrors.description  = "Incident description is required.";
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0; // true = no errors
+    return Object.keys(newErrors).length === 0;
   };
 
   // ── Submit the form ──
   const handleSubmit = async () => {
     if (!validate()) return;
+
+    const token = authToken || localStorage.getItem("token");
+
+    if (!token) {
+      alert("Not logged in. Please wait...");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:3001/employee-reports", {
+      const response = await fetch(API_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          ...form,
-          department:       form.department       || null,
-          previousWarnings: form.previousWarnings || null,
-          actionTaken:      form.actionTaken       || null,
-          additionalNotes:  form.additionalNotes   || null,
+          EmployeeName:     form.employeeName,
+          Department:       form.department       || null,
+          ReportType:       form.reportType,
+          ReportDate:       form.reportDate,
+          ReportedBy:       form.reportedBy,
+          Description:      form.description,
+          PreviousWarnings: form.previousWarnings || null,
+          ActionTaken:      form.actionTaken      || null,
+          AdditionalNotes:  form.additionalNotes  || null,
         }),
       });
 
-      if (response.ok) setSuccessOpen(true);
-      else alert("Submission failed. Check backend logs.");
-    } catch {
-      alert("Connection Error: Is the backend running on port 3001?");
+      // ── Safer parsing: read as text first ──
+      const text = await response.text();
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("Invalid JSON from server");
+      }
+
+      if (response.ok && data.Success) {
+        setSuccessOpen(true);
+      } else if (response.status === 401) {
+        alert("Session expired. Please log in again.");
+      } else if (response.status === 403) {
+        alert("You do not have permission to submit employee reports.");
+      } else {
+        console.error("Backend error:", data);
+        alert(data?.Message || "Submission failed.");
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+      alert("Cannot connect to backend. Make sure server is running on port 4000.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Reset every field back to empty ──
+  // ── Reset every field back to empty (keeps reportedBy from logged-in user) ──
   const handleReset = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm, reportedBy: currentUser });
     setErrors({});
   };
 
@@ -139,22 +222,6 @@ export default function EmployeeReportPage() {
 
         <Stack spacing={3}>
 
-          {/* Employee ID */}
-          <Box>
-            <Typography level="title-sm" fontWeight={500} mb={0.75}>
-              Employee ID <Typography component="span" color="danger">*</Typography>
-            </Typography>
-            <Input
-              size="lg"
-              placeholder="e.g. EMP-001"
-              value={form.employeeId}
-              onChange={(e) => update("employeeId", e.target.value)}
-              error={!!errors.employeeId}
-              sx={{ width: "100%" }}
-            />
-            {errors.employeeId && <Typography level="body-xs" color="danger" mt={0.5}>{errors.employeeId}</Typography>}
-          </Box>
-
           {/* Employee Full Name */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>
@@ -168,13 +235,16 @@ export default function EmployeeReportPage() {
               error={!!errors.employeeName}
               sx={{ width: "100%" }}
             />
-            {errors.employeeName && <Typography level="body-xs" color="danger" mt={0.5}>{errors.employeeName}</Typography>}
+            {errors.employeeName && (
+              <Typography level="body-xs" color="danger" mt={0.5}>{errors.employeeName}</Typography>
+            )}
           </Box>
 
           {/* Department — optional */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>
-              Department <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+              Department{" "}
+              <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
             </Typography>
             <Input
               size="lg"
@@ -185,18 +255,24 @@ export default function EmployeeReportPage() {
             />
           </Box>
 
-          {/* Reported By — read-only, auto-filled */}
+          {/* Reported By — read-only, auto-filled from JWT user */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>Reported By</Typography>
             <Input
               size="lg"
               value={form.reportedBy}
               readOnly
+              placeholder={currentUser ? "" : "Loading..."}
               endDecorator={<Typography level="body-xs" textColor="text.tertiary">Auto-filled</Typography>}
-              sx={{ width: "100%", bgcolor: "background.level1", cursor: "not-allowed", "& input": { cursor: "not-allowed" } }}
+              sx={{
+                width: "100%",
+                bgcolor: "background.level1",
+                cursor: "not-allowed",
+                "& input": { cursor: "not-allowed" },
+              }}
             />
             <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>
-              Automatically set to your account name.
+              Automatically set to your logged-in account name.
             </Typography>
           </Box>
 
@@ -208,7 +284,13 @@ export default function EmployeeReportPage() {
               value={form.reportDate}
               readOnly
               endDecorator={<Typography level="body-xs" textColor="text.tertiary">Auto-filled</Typography>}
-              sx={{ width: "100%", maxWidth: 320, bgcolor: "background.level1", cursor: "not-allowed", "& input": { cursor: "not-allowed" } }}
+              sx={{
+                width: "100%",
+                maxWidth: 320,
+                bgcolor: "background.level1",
+                cursor: "not-allowed",
+                "& input": { cursor: "not-allowed" },
+              }}
             />
             <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>
               Automatically set to today's date.
@@ -232,7 +314,9 @@ export default function EmployeeReportPage() {
                 <Option key={type} value={type}>{type}</Option>
               ))}
             </Select>
-            {errors.reportType && <Typography level="body-xs" color="danger" mt={0.5}>{errors.reportType}</Typography>}
+            {errors.reportType && (
+              <Typography level="body-xs" color="danger" mt={0.5}>{errors.reportType}</Typography>
+            )}
           </Box>
 
           {/* Incident Description */}
@@ -249,13 +333,16 @@ export default function EmployeeReportPage() {
               error={!!errors.description}
               sx={{ width: "100%", resize: "vertical" }}
             />
-            {errors.description && <Typography level="body-xs" color="danger" mt={0.5}>{errors.description}</Typography>}
+            {errors.description && (
+              <Typography level="body-xs" color="danger" mt={0.5}>{errors.description}</Typography>
+            )}
           </Box>
 
           {/* Previous Warnings — optional */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>
-              Previous Warnings <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+              Previous Warnings{" "}
+              <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
             </Typography>
             <Textarea
               placeholder="List any previous warnings issued to this employee…"
@@ -270,7 +357,8 @@ export default function EmployeeReportPage() {
           {/* Action Taken — optional */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>
-              Action Taken <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+              Action Taken{" "}
+              <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
             </Typography>
             <Textarea
               placeholder="Describe any disciplinary actions taken…"
@@ -285,7 +373,8 @@ export default function EmployeeReportPage() {
           {/* Additional Notes — optional */}
           <Box>
             <Typography level="title-sm" fontWeight={500} mb={0.75}>
-              Additional Notes <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
+              Additional Notes{" "}
+              <Typography component="span" level="body-xs" textColor="text.tertiary">(optional)</Typography>
             </Typography>
             <Textarea
               placeholder="Any extra context or follow-up details…"

@@ -37,10 +37,10 @@ import LogoutIcon from "@mui/icons-material/Logout";
 
 import { navItems } from "@/config/navigation";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserProfileMedia } from "@/hooks/useUserProfileMedia";
 import { UserRole } from "@/types/roles";
 import { useAuth } from "@/auth/AuthProvider";
 import { clearAuthCookie } from "@/lib/authCookies";
-import { useUserProfileMedia } from "@/hooks/useUserProfileMedia";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -102,8 +102,33 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  const { logout, user } = useAuth();
-  const { avatarUrl } = useUserProfileMedia(user?.id);
+  const { logout, user, backendRoleName } = useAuth();
+  const { avatarUrl, loadProfileMedia } = useUserProfileMedia(user?.id);
+
+  // Refetch avatar when user navigates or refocuses tab so sidebar updates after profile image change (no full refresh).
+  React.useEffect(() => {
+    void loadProfileMedia();
+  }, [pathname, loadProfileMedia]);
+
+  React.useEffect(() => {
+    const onFocus = () => void loadProfileMedia();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadProfileMedia]);
+
+  // Optional: profile page can dispatch this after upload for instant sidebar update: window.dispatchEvent(new CustomEvent('profile-media-updated'))
+  React.useEffect(() => {
+    const onProfileMediaUpdated = () => void loadProfileMedia();
+    window.addEventListener("profile-media-updated", onProfileMediaUpdated);
+    return () => window.removeEventListener("profile-media-updated", onProfileMediaUpdated);
+  }, [loadProfileMedia]);
+
+  const roleLabel =
+    backendRoleName === "SuperAdmin"
+      ? "Super Admin"
+      : user?.role
+        ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+        : "";
 
   const { has } = usePermissions(userRole);
 
@@ -271,15 +296,13 @@ export default function Sidebar({
             justifyContent: collapsed ? "center" : "flex-start",
           }}
         >
-          <Avatar size="sm" src={avatarUrl ?? undefined}>
-            {user?.name?.charAt(0).toUpperCase() ?? "U"}
-          </Avatar>
+          <Avatar size="sm" src={avatarUrl ?? undefined} alt="" />
 
           {!collapsed && (
             <Box>
               <Typography level="body-sm">{user?.name ?? "…"}</Typography>
               <Typography level="body-xs" color="neutral">
-                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""}
+                {roleLabel}
               </Typography>
             </Box>
           )}

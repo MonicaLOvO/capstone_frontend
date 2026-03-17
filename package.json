@@ -14,11 +14,13 @@
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@mui/icons-material": "^7.3.7",
     "@mui/joy": "^5.0.0-beta.52",
+    "framer-motion": "^12.35.2",
     "html5-qrcode": "^2.3.8",
     "next": "16.1.6",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "recharts": "^3.8.0"
   },
   "devDependencies": {
     "@types/node": "^20",

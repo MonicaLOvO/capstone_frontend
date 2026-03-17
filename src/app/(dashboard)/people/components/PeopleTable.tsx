@@ -5,6 +5,9 @@ import { PeopleRowMenu } from "./PeopleRowMenu";
 import { useAuth } from "@/auth/AuthProvider";
 import { usePermissions } from "@/hooks/usePermissions";
 
+/** Backend role name – used for "only SuperAdmin can edit/delete Admin users" */
+export type BackendRoleName = "SuperAdmin" | "Admin" | "Manager" | "Staff";
+
 /**
  * Shared Person type
  * (exported so page.tsx can reuse safely)
@@ -17,6 +20,8 @@ export type Person = {
   /** Display name for sidebar when logged in; may differ from email.  */
   username?: string;
   role: "admin" | "manager" | "staff";
+  /** Backend role name – e.g. "Admin" vs "SuperAdmin" for permission rules */
+  backendRoleName?: BackendRoleName;
   department: string;
   status: "active" | "inactive";
   createdAt: string;
@@ -25,6 +30,10 @@ export type Person = {
 interface Props {
   people: Person[];
   loading?: boolean;
+  /** Current user id – used to hide action menu on own row (cannot edit self) */
+  currentUserId?: string;
+  /** Backend role of current user – only SuperAdmin can edit/delete/disable Admin users */
+  currentUserBackendRole?: BackendRoleName;
   onEditPerson?: (person: Person) => void;
   onDeletePerson?: (person: Person) => void;
   onToggleStatus?: (person: Person) => void;
@@ -34,6 +43,8 @@ interface Props {
 export function PeopleTable({
   people,
   loading,
+  currentUserId,
+  currentUserBackendRole,
   onEditPerson,
   pagination,
   onDeletePerson,
@@ -107,11 +118,18 @@ export function PeopleTable({
               </tr>
             ) : (
               people.map((p) => {
-                const isSelf = false; // later: p.id === userId
+                const isSelf = !!currentUserId && p.id === currentUserId;
+                const isTargetSuperAdmin = p.backendRoleName === "SuperAdmin";
 
+                // SuperAdmin is never editable from UI (industry standard); no action menu for SuperAdmin rows.
+                // Admin cannot edit other Admins; SuperAdmin can edit Admin/Manager/Staff; Manager can edit Staff only.
                 const canEditTarget =
                   !isSelf &&
-                  ((effectiveRole === "admin" && p.role !== "admin") ||
+                  !isTargetSuperAdmin &&
+                  (currentUserBackendRole === "SuperAdmin" ||
+                    (effectiveRole === "admin" &&
+                      currentUserBackendRole === "Admin" &&
+                      p.role !== "admin") ||
                     (effectiveRole === "manager" && p.role === "staff"));
 
                 return (
@@ -148,7 +166,7 @@ export function PeopleTable({
                             : "neutral"
                         }
                         sx={{
-                          minWidth: 70,
+                          minWidth: 80,
                           px: 0.5,
                           display: "inline-flex",
                           justifyContent: "center",
@@ -156,7 +174,9 @@ export function PeopleTable({
                           "& .MuiChip-label": { textAlign: "center" },
                         }}
                       >
-                        {p.role}
+                        {p.backendRoleName === "SuperAdmin"
+                          ? "Super Admin"
+                          : p.role.charAt(0).toUpperCase() + p.role.slice(1)}
                       </Chip>
                     </td>
 
@@ -179,7 +199,7 @@ export function PeopleTable({
                             : {}),
                         }}
                       >
-                        {p.status}
+                        {p.status === "active" ? "Active" : "Inactive"}
                       </Chip>
                     </td>
 

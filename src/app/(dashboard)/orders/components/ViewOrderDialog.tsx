@@ -1,3 +1,5 @@
+// View order dialog:
+// shows a read-only summary of one order and resolves missing product names when needed.
 'use client';
 
 import {
@@ -24,6 +26,7 @@ type ViewOrderDialogProps = {
   order: Order | null;
 };
 
+// Converts backend status values into user-facing status labels.
 function toStatusLabel(status: string): string {
   if (status === '0') return 'Processing';
   if (status === '1') return 'Pending';
@@ -32,6 +35,7 @@ function toStatusLabel(status: string): string {
   return 'Unknown';
 }
 
+// Formats order dates for display in the read-only view.
 function toDisplayDate(value: string): string {
   if (!value) return '-';
   const parsed = new Date(value);
@@ -39,10 +43,12 @@ function toDisplayDate(value: string): string {
   return parsed.toLocaleDateString();
 }
 
+// Formats currency values for item rows and totals.
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+// Renders one labeled read-only field in the order summary.
 function FormField({ label, value }: { label: string; value: string }) {
   return (
     <Box sx={{ flex: 1 }}>

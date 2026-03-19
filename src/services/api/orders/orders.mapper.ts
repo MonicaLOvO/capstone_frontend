@@ -1,5 +1,9 @@
+// Orders mapper:
+
+// converts raw backend DTOs into normalized frontend order and order-item models.
 import type { OrderDTO, OrderItemDTO } from "./orders.types";
 
+// Frontend shape used for a single order item in the UI.
 export type OrderItem = {
   id: string;
   orderId: string;
@@ -9,6 +13,7 @@ export type OrderItem = {
   unitPrice: number;
 };
 
+// Frontend shape used for an order and its nested items.
 export type Order = {
   id: string;
   orderType: string;
@@ -20,6 +25,7 @@ export type Order = {
   orderItems: OrderItem[];
 };
 
+// Normalizes number-like API values into safe numeric values for the UI.
 function toNumber(value: number | string | null | undefined): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return value;
@@ -27,11 +33,13 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+// Converts API date values into strings the app can store and display.
 function toStringDate(value: string | Date | null | undefined): string {
   if (!value) return "";
   return typeof value === "string" ? value : value.toISOString();
 }
 
+// Maps an order item DTO from the backend into the frontend model.
 export function mapOrderItem(dto: OrderItemDTO): OrderItem {
   return {
     id: dto.Id,
@@ -43,6 +51,7 @@ export function mapOrderItem(dto: OrderItemDTO): OrderItem {
   };
 }
 
+// Maps an order DTO from the backend into the frontend model.
 export function mapOrder(dto: OrderDTO): Order {
   return {
     id: dto.Id,

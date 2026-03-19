@@ -1,3 +1,5 @@
+// Create order dialog:
+// collects new order details, lets users attach inventory items, and submits the new order payload.
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -43,6 +45,7 @@ type AddedOrderItem = {
   unitPrice: number;
 };
 
+// Formats a value for date input fields used by the form.
 function toDateInput(value?: string | Date) {
   if (!value) return "";
   const date = typeof value === "string" ? new Date(value) : value;
@@ -50,10 +53,12 @@ function toDateInput(value?: string | Date) {
   return date.toISOString().slice(0, 10);
 }
 
+// Returns today's date in the format expected by date inputs.
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Builds the initial form state for a new order.
 function toFormValues(initial?: Partial<UpsertOrderDTO> | null): OrderFormValues {
   return {
     OrderType: String(initial?.OrderType ?? ""),
@@ -63,10 +68,12 @@ function toFormValues(initial?: Partial<UpsertOrderDTO> | null): OrderFormValues
   };
 }
 
+// Checks whether a text field contains a meaningful value.
 function isNonEmpty(s: string) {
   return s.trim().length > 0;
 }
 
+// Formats currency totals for inventory rows and the order summary.
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`;
 }
@@ -147,11 +154,13 @@ export function OrderDialog({
     };
   }, [debouncedInventorySearch, open]);
 
+  // Updates one form field and clears any prior validation error for it.
   const setField = (key: keyof OrderFormValues, val: string) => {
     setValues((prev) => ({ ...prev, [key]: val }));
     setErrors((prev) => ({ ...prev, [key]: "" }));
   };
 
+  // Increments or decrements an added item's quantity within available stock.
   function changeAddedQuantity(inventoryItemId: string, delta: number) {
     // Quantity changes are capped by what is currently available in stock.
     setAddedItems((prev) =>
@@ -171,6 +180,7 @@ export function OrderDialog({
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
+  // Restricts addable results to inventory that is currently available for ordering.
   function canAddItem(item: InventoryItem) {
     return (
       (item.status === InventoryItemStatusEnum.InStock || item.status === InventoryItemStatusEnum.LowStock) &&
@@ -178,6 +188,7 @@ export function OrderDialog({
     );
   }
 
+  // Adds a searched inventory item into the pending order list.
   function addItem(item: InventoryItem) {
     // Re-adding an existing item increases its quantity instead of duplicating the row.
     if (!canAddItem(item)) return;
@@ -213,10 +224,12 @@ export function OrderDialog({
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
+  // Removes one inventory item from the pending order.
   function removeItem(inventoryItemId: string) {
     setAddedItems((prev) => prev.filter((x) => x.inventoryItemId !== inventoryItemId));
   }
 
+  // Validates the order form before confirmation.
   function validate(v: OrderFormValues) {
     // Orders must have basic metadata plus at least one attached inventory item.
     const next: Record<string, string> = {};
@@ -227,6 +240,7 @@ export function OrderDialog({
     return next;
   }
 
+  // Submits the finished order payload to the parent page.
   async function handleSubmit() {
     // Build the backend payload from form state and selected inventory rows.
     const nextErrors = validate(values);
@@ -254,6 +268,7 @@ export function OrderDialog({
     }
   }
 
+  // Opens the add confirmation modal once validation passes.
   function requestSubmitConfirmation() {
     const nextErrors = validate(values);
     setErrors(nextErrors);
@@ -262,6 +277,7 @@ export function OrderDialog({
     setConfirmAddOpen(true);
   }
 
+  // Opens the cancel confirmation modal before discarding work.
   function requestCancelConfirmation() {
     setConfirmCancelOpen(true);
   }
@@ -506,6 +522,7 @@ export function OrderDialog({
       </ModalDialog>
 
     </Modal>
+      {/* Confirmation modal shown before the order is actually created. */}
       <Modal open={confirmAddOpen} onClose={() => setConfirmAddOpen(false)}>
         {/* Confirm before finalizing the order and adjusting inventory. */}
         <ModalDialog size="sm">
@@ -533,6 +550,7 @@ export function OrderDialog({
         </ModalDialog>
       </Modal>
 
+      {/* Confirmation modal shown before the draft order is discarded. */}
       <Modal open={confirmCancelOpen} onClose={() => setConfirmCancelOpen(false)}>
         {/* Confirm before discarding the in-progress order. */}
         <ModalDialog size="sm">

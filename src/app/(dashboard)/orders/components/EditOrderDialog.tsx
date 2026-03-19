@@ -1,3 +1,5 @@
+// Edit order dialog:
+// loads a full order, lets users adjust its details and items, and reconciles inventory on save.
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -51,6 +53,7 @@ type EditableOrderItem = {
 
 type ConfirmAction = "save" | "cancel" | null;
 
+// Formats a value for date input fields used by the dialog form.
 function toDateInput(value?: string | Date) {
   if (!value) return "";
   const date = typeof value === "string" ? new Date(value) : value;
@@ -58,20 +61,24 @@ function toDateInput(value?: string | Date) {
   return date.toISOString().slice(0, 10);
 }
 
+// Checks whether a text field contains a meaningful value.
 function isNonEmpty(value: string) {
   return value.trim().length > 0;
 }
 
+// Formats currency totals for item rows and order summaries.
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`;
 }
 
+// Maps a quantity to the inventory status value expected by the backend.
 function getInventoryStatus(quantity: number): number {
   if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
   if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
   return Number(InventoryItemStatusEnum.InStock);
 }
 
+// Converts an order model into editable form values.
 function toFormValues(order: Order): OrderFormValues {
   return {
     OrderType: String(order.orderType ?? ""),
@@ -81,6 +88,7 @@ function toFormValues(order: Order): OrderFormValues {
   };
 }
 
+// Creates a stable snapshot used to detect unsaved dialog changes.
 function buildSnapshot(values: OrderFormValues, items: EditableOrderItem[]) {
   return JSON.stringify({
     OrderType: values.OrderType.trim(),
@@ -96,6 +104,7 @@ function buildSnapshot(values: OrderFormValues, items: EditableOrderItem[]) {
   });
 }
 
+// Converts an inventory model back into the DTO shape required for updates.
 function mapInventoryToDto(item: InventoryItem, quantity: number): InventoryItemDTO {
   return {
     Id: item.id,
@@ -134,6 +143,7 @@ export default function EditOrderDialog({
     OrderStatus: String(OrderStatusEnum.Pending),
     OrderCompletedDate: "",
   });
+  
   const [addedItems, setAddedItems] = useState<EditableOrderItem[]>([]);
   const [inventoryLookup, setInventoryLookup] = useState<Record<string, InventoryItem>>({});
   const [inventorySearch, setInventorySearch] = useState("");
@@ -148,6 +158,7 @@ export default function EditOrderDialog({
   const [initialSnapshot, setInitialSnapshot] = useState<string>("");
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
+  // Tracks the original reserved quantity per inventory item for stock reconciliation.
   const originalQuantities = useMemo(() => {
     const quantities = new Map<string, number>();
     if (!order) return quantities;
@@ -299,6 +310,7 @@ export default function EditOrderDialog({
     };
   }, [debouncedInventorySearch, initializing, open, order]);
 
+  // Calculates the maximum quantity this order can currently assign for one inventory item.
   function getQuantityAvailable(inventoryItemId: string) {
     // Existing order quantities count as already reserved, so users can reallocate them safely.
     const currentQuantity =
@@ -311,11 +323,13 @@ export default function EditOrderDialog({
     return Math.max(inventoryItem.quantity + originalQuantity, currentQuantity);
   }
 
+  // Updates one form field and clears any prior validation error for it.
   function setField(key: keyof OrderFormValues, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
+  // Increments or decrements an item's quantity within allowed stock limits.
   function changeAddedQuantity(inventoryItemId: string, delta: number) {
     // Quantity edits stay within the stock that can be assigned to this order.
     setAddedItems((prev) =>
@@ -335,6 +349,7 @@ export default function EditOrderDialog({
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
+  // Adds an inventory result into the editable order item list.
   function addItem(item: InventoryItem) {
     // Adding an item merges into an existing row when the order already contains it.
     const maxQuantity = Math.max(
@@ -375,10 +390,12 @@ export default function EditOrderDialog({
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
+  // Removes one inventory item from the editable order.
   function removeItem(inventoryItemId: string) {
     setAddedItems((prev) => prev.filter((item) => item.inventoryItemId !== inventoryItemId));
   }
 
+  // Validates order fields and stock availability before save.
   function validate() {
     // Validation prevents saving invalid order metadata or over-allocating stock.
     const next: Record<string, string> = {};
@@ -401,12 +418,14 @@ export default function EditOrderDialog({
     return next;
   }
 
+  // Closes the dialog immediately when confirmation is no longer needed.
   function closeWithoutConfirmation() {
     if (submitting) return;
     setConfirmAction(null);
     onClose();
   }
 
+  // Intercepts close requests so unsaved edits can be confirmed first.
   function requestClose() {
     if (submitting) return;
     if (!isDirty) {
@@ -417,6 +436,7 @@ export default function EditOrderDialog({
     setConfirmAction("cancel");
   }
 
+  // Opens the save confirmation modal if the form is valid.
   function requestSaveConfirmation() {
     const nextErrors = validate();
     setErrors(nextErrors);
@@ -425,6 +445,7 @@ export default function EditOrderDialog({
     setConfirmAction("save");
   }
 
+  // Persists order changes, item changes, and inventory adjustments.
   async function handleSave() {
     if (!order) return;
     const currentOrder = order;
@@ -797,6 +818,7 @@ export default function EditOrderDialog({
         </ModalDialog>
       </Modal>
 
+      {/* A second modal confirms saving or discarding when the dialog is dirty. */}
       <Modal open={confirmAction !== null} onClose={() => setConfirmAction(null)}>
         {/* Confirm either saving or discarding once the order has unsaved changes. */}
         <ModalDialog size="sm">

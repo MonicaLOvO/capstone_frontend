@@ -1,3 +1,8 @@
+// Orders types:
+// defines backend DTOs, create/update payloads, enums, and query parameter shapes.
+
+
+// Backend enum values used to represent an order's lifecycle state.
 export enum OrderStatusEnum {
   Processing = "0",
   Pending = "1",
@@ -5,6 +10,7 @@ export enum OrderStatusEnum {
   Completed = "6",
 }
 
+// Raw order item shape returned by the backend API.
 export type OrderItemDTO = {
   Id: string;
   OrderId?: string | null;
@@ -14,6 +20,7 @@ export type OrderItemDTO = {
   UnitPrice?: number | string | null;
 };
 
+// Raw order shape returned by the backend API.
 export type OrderDTO = {
   Id: string;
   OrderType?: string | null;
@@ -29,6 +36,7 @@ export type OrderDTO = {
   OrderItems?: OrderItemDTO[] | null;
 };
 
+// Payload used when creating or updating a single order item.
 export type UpsertOrderItemDTO = {
   Id?: string;
   OrderId?: string;
@@ -36,6 +44,7 @@ export type UpsertOrderItemDTO = {
   Quantity?: number;
 };
 
+// Payload used when creating or updating an order.
 export type UpsertOrderDTO = {
   Id?: string;
   OrderType?: string;
@@ -45,6 +54,7 @@ export type UpsertOrderDTO = {
   OrderItems?: UpsertOrderItemDTO[];
 };
 
+// Query options for paginated order list requests.
 export type OrderListQuery = {
   Page?: number;
   PageSize?: number;
@@ -59,6 +69,7 @@ export type OrderListQuery = {
   OrderDirection?: "asc" | "ASC" | "desc" | "DESC";
 };
 
+// Query options for paginated order item list requests.
 export type OrderItemListQuery = {
   Page?: number;
   PageSize?: number;

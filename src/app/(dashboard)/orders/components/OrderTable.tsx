@@ -1,3 +1,5 @@
+// Orders table:
+// fetches paginated orders, renders the desktop table, and drives view, edit, and delete actions.
 'use client';
 
 import {
@@ -53,10 +55,12 @@ type OrderTableProps = {
   onTotalChange: (total: number) => void;
 };
 
+// Normalizes search input before matching ids and order types.
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
 
+// Converts backend status values into user-facing status labels.
 function toStatusLabel(status: string): RowData['status'] {
   if (status === '0') return 'Processing';
   if (status === '1') return 'Pending';
@@ -65,6 +69,7 @@ function toStatusLabel(status: string): RowData['status'] {
   return 'Unknown';
 }
 
+// Formats order dates for display in the table.
 function toDisplayDate(value: string): string {
   if (!value) return '-';
   const parsed = new Date(value);
@@ -72,6 +77,7 @@ function toDisplayDate(value: string): string {
   return parsed.toLocaleDateString();
 }
 
+// Maps a full order model into the lighter table row shape.
 function mapOrderToRow(order: Order): RowData {
   return {
     id: order.id,
@@ -81,12 +87,14 @@ function mapOrderToRow(order: Order): RowData {
   };
 }
 
+// Compares two rows for descending table sorts.
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   if (b[orderBy] < a[orderBy]) return -1;
   if (b[orderBy] > a[orderBy]) return 1;
   return 0;
 }
 
+// Returns the comparator used by the table's client-side sorting.
 function getComparator<Key extends PropertyKey>(
   order: SortOrder,
   orderBy: Key,
@@ -99,6 +107,7 @@ function getComparator<Key extends PropertyKey>(
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
+// Chooses the icon and color used by each status chip.
 function statusChipProps(status: RowData['status']) {
   return {
     startDecorator: {
@@ -118,6 +127,7 @@ function statusChipProps(status: RowData['status']) {
   };
 }
 
+// Maps a quantity to the inventory status value expected by the backend.
 function getInventoryStatus(quantity: number): number {
   if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
   if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
@@ -236,6 +246,8 @@ export default function OrderTable({
 
   const allSelected = rows.length > 0 && selected.length === rows.length;
   const hasPartialSelection = selected.length > 0 && selected.length < rows.length;
+
+  // Opens the view dialog after loading the selected order details.
   async function handleView(orderId: string) {
     // Fetch the full order so the detail dialog has all items and totals available.
     try {
@@ -252,6 +264,7 @@ export default function OrderTable({
     }
   }
 
+  // Opens the edit dialog after loading the selected order details.
   async function handleEdit(orderId: string) {
     // Fetch the full order before opening the edit experience.
     try {
@@ -268,12 +281,14 @@ export default function OrderTable({
     }
   }
 
+  // Opens the delete confirmation modal for one order.
   function requestDelete(orderId: string) {
     setDeleteId(orderId);
     setDeleteError(null);
     setDeleteOpen(true);
   }
 
+  // Deletes the order and restores each ordered quantity back into inventory.
   async function confirmDelete() {
     if (!deleteId) return;
 
@@ -517,6 +532,7 @@ export default function OrderTable({
         order={viewOrder}
       />
 
+      {/* The edit dialog reuses the selected order and refreshes the table after save. */}
       <EditOrderDialog
         open={editOpen}
         onClose={() => {
@@ -532,6 +548,7 @@ export default function OrderTable({
         order={editOrder}
        />
 
+      {/* Deletion uses a dedicated confirmation modal because it is irreversible. */}
       <Modal
         open={deleteOpen}
         onClose={() => {

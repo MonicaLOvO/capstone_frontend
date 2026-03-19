@@ -1,8 +1,10 @@
+// Orders page:
+// coordinates order search, filtering, pagination, and the create-order workflow.
 'use client';
 
 import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option, Breadcrumbs, Link, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import OrderTable from './components/OrderTable';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
@@ -12,9 +14,8 @@ import { OrderStatusEnum, type UpsertOrderDTO } from '@/services/api/orders/orde
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { inventoryApi } from '@/services/api/inventory/inventory.api';
 import { InventoryItemStatusEnum } from '@/services/api/inventory/inventory.types';
-import router from 'next/router';
-import { useAuth } from '@/auth/AuthProvider';
 
+// Maps a quantity to the inventory status value expected by the backend.
 function getInventoryStatus(quantity: number): number {
   if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
   if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
@@ -32,11 +33,13 @@ export default function OrdersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Total count comes from the table so the page can render pagination controls.
   const [total, setTotal] = useState(0);
   const handleTotalChange = useCallback((nextTotal: number) => {
     setTotal(nextTotal);
   }, []);
 
+  // Creates an order and then decrements inventory for each selected item.
   async function handleCreate(payload: UpsertOrderDTO) {
     // Creating an order also decrements the selected inventory quantities.
     setSubmitting(true);
@@ -78,17 +81,8 @@ export default function OrdersPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  // const { isAuthenticated } = useAuth();
 
-  // Check if user is logged in
-    // useEffect(() => {
-        // if (isAuthenticated) {
-            // router.replace('/(tabs)/home');
-        // }
-    // }, [isAuthenticated, router]);
-
-    
-
+  // Renders reusable filter controls for the orders toolbar.
   const renderFilters = () => (
     <React.Fragment>
       <FormControl size="sm">
@@ -113,8 +107,6 @@ export default function OrdersPage() {
 
         </Select>
       </FormControl>
-      
-
     </React.Fragment>
   );
   
@@ -170,6 +162,9 @@ export default function OrdersPage() {
           <Typography level="h2">Orders</Typography>
 
           <Stack direction="row" spacing={1.5}>
+
+            {/* Download PDF button (In Progress) */}
+
             {/* <Button variant="solid" color="primary">
               Download PDF
             </Button> */}
@@ -226,6 +221,7 @@ export default function OrdersPage() {
           />
       </Box>
 
+      {/* Pagination controls are kept outside the table so page state stays page-level. */}
        <Box
           sx={{
             px: 2,

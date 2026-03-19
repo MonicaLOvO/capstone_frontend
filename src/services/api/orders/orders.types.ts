@@ -1,6 +1,8 @@
 export enum OrderStatusEnum {
   Processing = "0",
   Pending = "1",
+  Cancelled = "4",
+  Completed = "6",
 }
 
 export type OrderItemDTO = {

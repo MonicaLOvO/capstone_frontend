@@ -39,7 +39,7 @@ interface Order {
 }
 
 function RowMenu() {
-    
+  // Mobile row actions live in a compact overflow menu.
   return (
     <Dropdown>
       <MenuButton
@@ -60,10 +60,12 @@ function RowMenu() {
 }
 
 export default function OrderList() {
+  // This is the mobile list presentation for orders.
   const [orderList, setOrderList] = useState<Order[]>([]);
 
   return (
     <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
+      {/* Each list row condenses the key order info for smaller screens. */}
       {orderList.map((order) => (
         <List key={order.id} size="sm" sx={{ '--order-paddingX': 0 }}>
           <ListItem

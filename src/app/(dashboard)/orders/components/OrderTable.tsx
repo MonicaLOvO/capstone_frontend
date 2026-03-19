@@ -22,19 +22,24 @@ import {
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import BlockIcon from '@mui/icons-material/Block';
+import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import { useEffect, useMemo, useState } from 'react';
 import { ordersApi } from '@/services/api/orders/orders.api';
 import type { Order } from '@/services/api/orders/orders.mapper';
+import { inventoryApi } from '@/services/api/inventory/inventory.api';
+import { InventoryItemStatusEnum } from '@/services/api/inventory/inventory.types';
 import ViewOrderDialog from './ViewOrderDialog';
+import EditOrderDialog from './EditOrderDialog';
 
 interface RowData {
   id: string;
   date: string;
-  status: 'Pending' | 'Processing' | 'Unknown';
+  status: 'Pending' | 'Processing' | 'Cancelled' | 'Completed' | 'Unknown';
   type: string;
 }
 
@@ -43,7 +48,7 @@ type SortOrder = 'asc' | 'desc';
 type OrderTableProps = {
   page: number;
   pageSize: number;
-  statusFilter: 'all' | '0' | '1';
+  statusFilter: 'all' | '0' | '1' | '4' | '6';
   search: string;
   onTotalChange: (total: number) => void;
 };
@@ -55,6 +60,8 @@ function normalize(value: string): string {
 function toStatusLabel(status: string): RowData['status'] {
   if (status === '0') return 'Processing';
   if (status === '1') return 'Pending';
+  if (status === '4') return 'Cancelled';
+  if (status === '6') return 'Completed';
   return 'Unknown';
 }
 
@@ -96,15 +103,25 @@ function statusChipProps(status: RowData['status']) {
   return {
     startDecorator: {
       Processing: <AutorenewRoundedIcon />,
-      Pending: <CheckRoundedIcon />,
+      Pending: <HourglassEmptyRoundedIcon />,
+      Cancelled: <BlockIcon />,
+      Completed: <CheckRoundedIcon />,
       Unknown: <BlockIcon />,
     }[status],
     color: {
       Processing: 'neutral',
-      Pending: 'success',
+      Pending: 'warning',
+      Cancelled: 'danger',
+      Completed: 'success',
       Unknown: 'danger',
-    }[status] as 'success' | 'neutral' | 'danger',
+    }[status] as 'success' | 'neutral' | 'danger' | 'warning',
   };
+}
+
+function getInventoryStatus(quantity: number): number {
+  if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
+  if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
+  return Number(InventoryItemStatusEnum.InStock);
 }
 
 export default function OrderTable({
@@ -114,6 +131,7 @@ export default function OrderTable({
   search,
   onTotalChange,
 }: OrderTableProps) {
+  // Table state tracks fetched rows plus the active view/edit/delete workflows.
   const [order, setOrder] = useState<SortOrder>('desc');
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [rows, setRows] = useState<RowData[]>([]);
@@ -125,6 +143,10 @@ export default function OrderTable({
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editOrder, setEditOrder] = useState<Order | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -132,6 +154,7 @@ export default function OrderTable({
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Load the current page of orders and re-run whenever filters or refresh keys change.
     let cancelled = false;
 
     async function loadOrders() {
@@ -203,6 +226,7 @@ export default function OrderTable({
   }, [onTotalChange, page, pageSize, reloadKey, search, statusFilter]);
 
   useEffect(() => {
+    // Drop selected ids that are no longer on the current page.
     setSelected((ids) => ids.filter((id) => rows.some((row) => row.id === id)));
   }, [rows]);
 
@@ -213,6 +237,7 @@ export default function OrderTable({
   const allSelected = rows.length > 0 && selected.length === rows.length;
   const hasPartialSelection = selected.length > 0 && selected.length < rows.length;
   async function handleView(orderId: string) {
+    // Fetch the full order so the detail dialog has all items and totals available.
     try {
       setViewOpen(true);
       setViewLoading(true);
@@ -227,6 +252,22 @@ export default function OrderTable({
     }
   }
 
+  async function handleEdit(orderId: string) {
+    // Fetch the full order before opening the edit experience.
+    try {
+      setEditOpen(true);
+      setEditLoading(true);
+      setEditError(null);
+      const fullOrder = await ordersApi.getById(orderId);
+      setEditOrder(fullOrder);
+    } catch (err) {
+      setEditOrder(null);
+      setEditError(err instanceof Error ? err.message : 'Failed to load order');
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
   function requestDelete(orderId: string) {
     setDeleteId(orderId);
     setDeleteError(null);
@@ -237,9 +278,35 @@ export default function OrderTable({
     if (!deleteId) return;
 
     try {
+      // Deleting an order also puts each ordered quantity back into inventory.
       setDeleteSubmitting(true);
       setDeleteError(null);
+      const orderToDelete = await ordersApi.getById(deleteId);
       await ordersApi.remove(deleteId);
+
+      await Promise.all(
+        orderToDelete.orderItems.map(async (orderItem) => {
+          if (!orderItem.inventoryItemId || orderItem.quantity <= 0) return;
+
+          const inventoryItem = await inventoryApi.getById(orderItem.inventoryItemId);
+          const nextQuantity = inventoryItem.quantity + orderItem.quantity;
+
+          await inventoryApi.update(orderItem.inventoryItemId, {
+            Id: inventoryItem.id,
+            ProductName: inventoryItem.productName || null,
+            Description: inventoryItem.description || null,
+            Quantity: nextQuantity,
+            UnitPrice: inventoryItem.unitPrice,
+            QrCodeValue: inventoryItem.qrCodeValue || null,
+            ImageUrl: inventoryItem.imageUrl || null,
+            Category: inventoryItem.category || null,
+            Location: inventoryItem.location || null,
+            Sku: inventoryItem.sku || null,
+            Status: getInventoryStatus(nextQuantity),
+          });
+        }),
+      );
+
       setDeleteOpen(false);
       setDeleteId(null);
       setReloadKey((current) => current + 1);
@@ -252,6 +319,7 @@ export default function OrderTable({
 
   return (
     <>
+      {/* The table is the main desktop view for browsing and acting on orders. */}
       <Sheet
         className="OrderTableContainer"
         variant="outlined"
@@ -320,6 +388,7 @@ export default function OrderTable({
           </thead>
 
           <tbody>
+            {/* Loading, empty, and error rows keep the table layout stable. */}
             {isLoading && (
               <tr>
                 <td colSpan={6}>
@@ -346,12 +415,15 @@ export default function OrderTable({
             {!isLoading &&
               !error &&
               sortedRows.map((row) => (
-                <tr key={row.id}>
+                <tr key={row.id} onClick={() => void handleView(row.id)} style={{ cursor: 'pointer' }}>
                   <td style={{ textAlign: 'center', width: 48 }}>
                     <Checkbox
                       size="sm"
                       checked={selected.includes(row.id)}
                       color={selected.includes(row.id) ? 'primary' : undefined}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                      }}
                       onChange={(event) => {
                         setSelected((ids) =>
                           event.target.checked
@@ -387,17 +459,40 @@ export default function OrderTable({
                             variant: 'soft',
                             color: 'neutral',
                             'aria-label': 'Row actions',
+                            onClick: (event: React.MouseEvent) => {
+                              event.stopPropagation();
+                            },
                           },
                         }}
                       >
                         <MoreHorizRoundedIcon />
                       </MenuButton>
                       <Menu size="sm" placement="bottom-end">
-                        <MenuItem onClick={() => handleView(row.id)}>
+                        <MenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleView(row.id);
+                          }}
+                        >
                           <VisibilityRoundedIcon />
                           View
                         </MenuItem>
-                        <MenuItem color="danger" onClick={() => requestDelete(row.id)}>
+                        <MenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleEdit(row.id);
+                          }}
+                        >
+                          <EditRoundedIcon />
+                          Edit
+                        </MenuItem>
+                        <MenuItem
+                          color="danger"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            requestDelete(row.id);
+                          }}
+                        >
                           <DeleteRoundedIcon />
                           Delete
                         </MenuItem>
@@ -422,6 +517,21 @@ export default function OrderTable({
         order={viewOrder}
       />
 
+      <EditOrderDialog
+        open={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setEditOrder(null);
+          setEditError(null);
+        }}
+        onSaved={() => {
+          setReloadKey((current) => current + 1);
+        }}
+        loading={editLoading}
+        error={editError}
+        order={editOrder}
+       />
+
       <Modal
         open={deleteOpen}
         onClose={() => {
@@ -433,6 +543,7 @@ export default function OrderTable({
         }}
       >
         <ModalDialog size="sm">
+          {/* Deletion is confirmed separately because it removes the whole order. */}
           <DialogTitle>Delete Order?</DialogTitle>
           <DialogContent>
             <Stack spacing={2}>

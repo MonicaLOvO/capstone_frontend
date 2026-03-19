@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserRole } from "@/types/roles";
 import { clearSession } from "@/auth/session";
+import { usersApi } from "@/services/api/users/users.api";
 
 /** Backend role name – used to enforce "only SuperAdmin can manage Admin users" */
 export type BackendRoleName = "SuperAdmin" | "Admin" | "Manager" | "Staff";
@@ -15,6 +16,9 @@ export type BackendRoleName = "SuperAdmin" | "Admin" | "Manager" | "Staff";
 type User = {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
   role: UserRole;
   /** Backend role name from JWT – use for rules like "Admin cannot edit other Admins" */
   backendRoleName: BackendRoleName;
@@ -28,6 +32,7 @@ type AuthContextType = {
   loading: boolean;
   login: (token: string) => Promise<void>;
   logout: () => void;
+  updateUser: (nextUser: Partial<User>) => void;
   /** Current user role (convenience so components can use const { role } = useAuth()) */
   role: UserRole | undefined;
   /** Backend role name – e.g. "SuperAdmin" vs "Admin" for permission rules */
@@ -48,12 +53,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const TOKEN_KEY = "wms_token";
 
+  const toFrontendRole = useCallback((rawRole: string): UserRole => {
+    if (rawRole === "superadmin" || rawRole === "admin") return "admin";
+    if (rawRole === "manager") return "manager";
+    return "staff";
+  }, []);
+
+  const toBackendRoleName = useCallback((rawRole: string): BackendRoleName => {
+    return rawRole === "superadmin"
+      ? "SuperAdmin"
+      : rawRole === "admin"
+        ? "Admin"
+        : rawRole === "manager"
+          ? "Manager"
+          : "Staff";
+  }, []);
+
+  const enrichUser = useCallback(async (baseUser: User): Promise<User> => {
+    try {
+      const currentUser = await usersApi.getCurrent();
+      const rawRole = (
+        currentUser.Role?.RoleName ??
+        baseUser.backendRoleName ??
+        "staff"
+      )
+        .toString()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+
+      const firstName = currentUser.FirstName?.trim() ?? "";
+      const lastName = currentUser.LastName?.trim() ?? "";
+
+      return {
+        ...baseUser,
+        id: currentUser.Id || baseUser.id,
+        firstName,
+        lastName,
+        email: currentUser.Email ?? baseUser.email,
+        role: toFrontendRole(rawRole),
+        backendRoleName: toBackendRoleName(rawRole),
+        name:
+          [firstName, lastName].filter(Boolean).join(" ") ||
+          baseUser.name ||
+          currentUser.Username ||
+          "User",
+      };
+    } catch {
+      return baseUser;
+    }
+  }, [toBackendRoleName, toFrontendRole]);
+
   /**
    * Decode JWT token payload
    * JWT format = header.payload.signature
    * We decode the payload to extract user information
    */
-  function decodeToken(token: string): User | null {
+  const decodeToken = useCallback((token: string): User | null => {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
       // Support both camelCase and PascalCase from backend (e.g. RoleName, UserName)
@@ -66,33 +121,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "staff"
       )
         .toString()
-        .toLowerCase();
-      // Map backend role names to frontend roles (align with users.mapper)
-      let role: UserRole = "staff";
-      if (rawRole === "superadmin" || rawRole === "admin") role = "admin";
-      else if (rawRole === "manager") role = "manager";
-      else if (rawRole === "staff") role = "staff";
+        .toLowerCase()
+        .replace(/\s+/g, "");
 
-      const backendRoleName: BackendRoleName =
-        rawRole === "superadmin"
-          ? "SuperAdmin"
-          : rawRole === "admin"
-            ? "Admin"
-            : rawRole === "manager"
-              ? "Manager"
-              : "Staff";
+      const firstName = String(
+        payload.firstName ?? payload.FirstName ?? "",
+      ).trim();
+      const lastName = String(
+        payload.lastName ?? payload.LastName ?? "",
+      ).trim();
+      const email = String(payload.email ?? payload.Email ?? "").trim();
 
       return {
         id: payload.userId ?? payload.sub ?? payload.UserId ?? "",
-        name: String(rawName).trim() || "User",
-        role,
-        backendRoleName,
+        name:
+          [firstName, lastName].filter(Boolean).join(" ") ||
+          String(rawName).trim() ||
+          "User",
+        firstName,
+        lastName,
+        email,
+        role: toFrontendRole(rawRole),
+        backendRoleName: toBackendRoleName(rawRole),
       };
     } catch (err) {
       console.error("Invalid JWT token", err);
       return null;
     }
-  }
+  }, [toBackendRoleName, toFrontendRole]);
 
   /**
    * Login function
@@ -112,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Store user in context
     setUser(decodedUser);
+    setUser(await enrichUser(decodedUser));
 
     // Authentication finished
     setLoading(false);
@@ -126,30 +183,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
+  function updateUser(nextUser: Partial<User>) {
+    setUser((currentUser) =>
+      currentUser
+        ? {
+            ...currentUser,
+            ...nextUser,
+          }
+        : currentUser,
+    );
+  }
+
   /**
    * When the application loads
    * check if a token already exists
    */
   useEffect(() => {
+    let cancelled = false;
 
-    const token = localStorage.getItem(TOKEN_KEY);
+    async function initializeAuth() {
+      const token = localStorage.getItem(TOKEN_KEY);
 
-    if (!token) {
-      setLoading(false);
-      return;
+      if (!token) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      const decodedUser = decodeToken(token);
+
+      if (!decodedUser) {
+        localStorage.removeItem(TOKEN_KEY);
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      if (!cancelled) {
+        setUser(decodedUser);
+      }
+
+      const nextUser = await enrichUser(decodedUser);
+
+      if (!cancelled) {
+        setUser(nextUser);
+        setLoading(false);
+      }
     }
 
-    const decodedUser = decodeToken(token);
+    void initializeAuth();
 
-    if (decodedUser) {
-      setUser(decodedUser);
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-
-    setLoading(false);
-
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [decodeToken, enrichUser]);
 
   /**
    * Provide auth values to the whole app
@@ -161,6 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         login,
         logout,
+        updateUser,
         role: user?.role,
         backendRoleName: user?.backendRoleName,
       }}

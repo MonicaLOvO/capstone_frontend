@@ -82,6 +82,7 @@ export function OrderDialog({
   onSubmit: (payload: UpsertOrderDTO) => Promise<void>;
   submitting: boolean;
 }) {
+  // Form state covers order details, inventory search, and selected order items.
   const [values, setValues] = useState<OrderFormValues>(() => toFormValues());
   const [inventorySearch, setInventorySearch] = useState("");
   const debouncedInventorySearch = useDebouncedValue(inventorySearch, 350);
@@ -96,6 +97,7 @@ export function OrderDialog({
   const orderTotal = addedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   useEffect(() => {
+    // Reset the dialog every time it opens so each new order starts clean.
     if (open) {
       setValues(toFormValues());
       setInventorySearch("");
@@ -111,6 +113,7 @@ export function OrderDialog({
   }, [open]);
 
   useEffect(() => {
+    // Search inventory as the user types so they can attach items to the order.
     if (!open) return;
     let cancelled = false;
 
@@ -150,6 +153,7 @@ export function OrderDialog({
   };
 
   function changeAddedQuantity(inventoryItemId: string, delta: number) {
+    // Quantity changes are capped by what is currently available in stock.
     setAddedItems((prev) =>
       prev.flatMap((item) => {
         if (item.inventoryItemId !== inventoryItemId) return [item];
@@ -175,6 +179,7 @@ export function OrderDialog({
   }
 
   function addItem(item: InventoryItem) {
+    // Re-adding an existing item increases its quantity instead of duplicating the row.
     if (!canAddItem(item)) return;
 
     setAddedItems((prev) => {
@@ -213,6 +218,7 @@ export function OrderDialog({
   }
 
   function validate(v: OrderFormValues) {
+    // Orders must have basic metadata plus at least one attached inventory item.
     const next: Record<string, string> = {};
     if (!isNonEmpty(v.OrderType)) next.OrderType = "Order type is required";
     if (!isNonEmpty(v.OrderDate)) next.OrderDate = "Order date is required";
@@ -222,6 +228,7 @@ export function OrderDialog({
   }
 
   async function handleSubmit() {
+    // Build the backend payload from form state and selected inventory rows.
     const nextErrors = validate(values);
     setErrors(nextErrors);
     setApiError(null);
@@ -280,6 +287,7 @@ export function OrderDialog({
 
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {/* Inline API errors appear above the form so they are hard to miss. */}
             {apiError ? (
               <Typography level="body-sm" color="danger">
                 {apiError}
@@ -287,6 +295,7 @@ export function OrderDialog({
             ) : null}
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              {/* Primary order fields live at the top for quick entry. */}
               <FormControl error={Boolean(errors.OrderType)} sx={{ flex: 1 }}>
                 <FormLabel>Order Type</FormLabel>
                 <Input
@@ -307,12 +316,15 @@ export function OrderDialog({
                 >
                   <Option value={OrderStatusEnum.Pending}>Pending</Option>
                   <Option value={OrderStatusEnum.Processing}>Processing</Option>
+                  <Option value={OrderStatusEnum.Cancelled}>Cancelled</Option>
+                  <Option value={OrderStatusEnum.Completed}>Completed</Option>
                 </Select>
                 {errors.OrderStatus ? <FormHelperText>{errors.OrderStatus}</FormHelperText> : null}
               </FormControl>
             </Stack>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              {/* Date fields are kept together because they are commonly edited as a pair. */}
               <FormControl error={Boolean(errors.OrderDate)} sx={{ flex: 1 }}>
                 <FormLabel>Order Date</FormLabel>
                 <Input
@@ -334,6 +346,7 @@ export function OrderDialog({
             </Stack>
 
             <Stack spacing={1}>
+              {/* Inventory search lets the user pull items into the order before saving. */}
               <Typography level="title-sm">Search Inventory Item</Typography>
               <Input
                 value={inventorySearch}
@@ -397,6 +410,7 @@ export function OrderDialog({
             </Stack>
 
             <Stack spacing={1}>
+              {/* This list is the pending contents of the order being created. */}
               <Typography level="title-sm">Items Added to Order</Typography>
               {addedItems.length === 0 ? (
                 <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
@@ -493,6 +507,7 @@ export function OrderDialog({
 
     </Modal>
       <Modal open={confirmAddOpen} onClose={() => setConfirmAddOpen(false)}>
+        {/* Confirm before finalizing the order and adjusting inventory. */}
         <ModalDialog size="sm">
           <DialogTitle>Confirm Order</DialogTitle>
           <DialogContent>
@@ -519,6 +534,7 @@ export function OrderDialog({
       </Modal>
 
       <Modal open={confirmCancelOpen} onClose={() => setConfirmCancelOpen(false)}>
+        {/* Confirm before discarding the in-progress order. */}
         <ModalDialog size="sm">
           <DialogTitle>Discard Order?</DialogTitle>
           <DialogContent>

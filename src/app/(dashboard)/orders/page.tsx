@@ -8,7 +8,7 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import { OrderDialog } from './components/OrderDialog';
 import { ordersApi } from '@/services/api/orders/orders.api';
-import type { UpsertOrderDTO } from '@/services/api/orders/orders.types';
+import { OrderStatusEnum, type UpsertOrderDTO } from '@/services/api/orders/orders.types';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { inventoryApi } from '@/services/api/inventory/inventory.api';
 import { InventoryItemStatusEnum } from '@/services/api/inventory/inventory.types';
@@ -22,10 +22,10 @@ function getInventoryStatus(quantity: number): number {
 }
 
 export default function OrdersPage() {
-  
+  // Page-level state for filters, pagination, and create-order workflow.
   const [page, setPage] = useState(1);
   const pageSize = 10;
-  const [statusFilter, setStatusFilter] = useState<'all' | '0' | '1'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | '0' | '1' | '4' | '6'>('all');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 350);
   const [createOpen, setCreateOpen] = useState(false);
@@ -38,6 +38,7 @@ export default function OrdersPage() {
   }, []);
 
   async function handleCreate(payload: UpsertOrderDTO) {
+    // Creating an order also decrements the selected inventory quantities.
     setSubmitting(true);
     try {
       await ordersApi.create(payload);
@@ -91,23 +92,24 @@ export default function OrdersPage() {
   const renderFilters = () => (
     <React.Fragment>
       <FormControl size="sm">
-
-        {/* Status Filter */}
+        {/* Status filter drives the backend order list query. */}
         <FormLabel>Status</FormLabel>
         <Select
           size="sm"
           placeholder="All"
           value={statusFilter}
           onChange={(_, value) => {
-            const next = (value ?? 'all') as 'all' | '0' | '1';
+            const next = (value ?? 'all') as 'all' | '0' | '1' | '4' | '6';
             setStatusFilter(next);
             setPage(1);
           }}
           slotProps={{ button: { sx: { whiteSpace: 'nowrap' } } }}
         >
           <Option value="all">All</Option>
-          <Option value="1">Pending</Option>
-          <Option value="0">Processing</Option>
+          <Option value={OrderStatusEnum.Pending}>Pending</Option>
+          <Option value={OrderStatusEnum.Processing}>Processing</Option>
+          <Option value={OrderStatusEnum.Cancelled}>Cancelled</Option>
+          <Option value={OrderStatusEnum.Completed}>Completed</Option>
 
         </Select>
       </FormControl>
@@ -127,7 +129,7 @@ export default function OrdersPage() {
       }}
       >
 
-        {/* Page Path */}
+        {/* Breadcrumbs keep the orders page aligned with the dashboard nav. */}
 
         <Breadcrumbs
           size="sm"
@@ -156,7 +158,7 @@ export default function OrdersPage() {
               </Typography>
             </Breadcrumbs>
             
-        {/* Page Header */}
+        {/* Header actions cover export and opening the create-order dialog. */}
         <Box
           sx={{
             display: 'flex',
@@ -168,9 +170,9 @@ export default function OrdersPage() {
           <Typography level="h2">Orders</Typography>
 
           <Stack direction="row" spacing={1.5}>
-            <Button variant="solid" color="primary">
+            {/* <Button variant="solid" color="primary">
               Download PDF
-            </Button>
+            </Button> */}
 
             <Button color="primary" variant="solid" onClick={() => setCreateOpen(true)}>
               + Add Order
@@ -180,7 +182,7 @@ export default function OrdersPage() {
         </Box>
         
 
-        {/* Table Filters */}
+        {/* Search and filters feed the table component below. */}
 
         <Box
           className="SearchAndFilters-tabletUp"
@@ -212,7 +214,7 @@ export default function OrdersPage() {
 
           {renderFilters()}
         </Box>
-        {/* Table Container */}
+        {/* The table owns fetching, row actions, and the view/edit dialogs. */}
         
           <OrderTable
             key={refreshKey}
@@ -258,7 +260,8 @@ export default function OrdersPage() {
           </Button>
         </Box>
 
-      <OrderDialog
+      {/* The create dialog is mounted here so page state controls refreshes after saves. */}
+       <OrderDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}

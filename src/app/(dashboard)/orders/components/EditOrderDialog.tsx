@@ -191,6 +191,7 @@ export default function EditOrderDialog({
       return;
     }
 
+    const currentOrder = order;
     let cancelled = false;
 
     async function initialize() {
@@ -204,7 +205,7 @@ export default function EditOrderDialog({
         setInventoryResults([]);
 
         const lookupEntries = await Promise.all(
-          order.orderItems.map(async (item) => {
+          currentOrder.orderItems.map(async (item) => {
             try {
               const inventoryItem = await inventoryApi.getById(item.inventoryItemId);
               return [item.inventoryItemId, inventoryItem] as const;
@@ -220,7 +221,7 @@ export default function EditOrderDialog({
           lookupEntries.filter((entry): entry is readonly [string, InventoryItem] => entry !== null),
         );
 
-        const nextItems = order.orderItems.map((item) => {
+        const nextItems = currentOrder.orderItems.map((item) => {
           const inventoryItem = nextLookup[item.inventoryItemId];
           return {
             orderItemId: item.id,
@@ -233,11 +234,12 @@ export default function EditOrderDialog({
           };
         });
 
-        const nextValues = toFormValues(order);
+        const nextValues = toFormValues(currentOrder);
         setInventoryLookup(nextLookup);
         setAddedItems(nextItems);
         setValues(nextValues);
-        setInitialSnapshot(buildSnapshot(nextValues, nextItems));       } catch (err) {
+        setInitialSnapshot(buildSnapshot(nextValues, nextItems));
+      } catch (err) {
         if (!cancelled) {
           setApiError(err instanceof Error ? err.message : "Failed to load order details");
         }
@@ -425,6 +427,7 @@ export default function EditOrderDialog({
 
   async function handleSave() {
     if (!order) return;
+    const currentOrder = order;
 
     const nextErrors = validate();
     setErrors(nextErrors);
@@ -439,11 +442,11 @@ export default function EditOrderDialog({
         addedItems.map((item) => [item.inventoryItemId, item] as const),
       );
       const originalItemsByInventoryId = new Map(
-        order.orderItems.map((item) => [item.inventoryItemId, item] as const),
+        currentOrder.orderItems.map((item) => [item.inventoryItemId, item] as const),
       );
 
-      await ordersApi.update(order.id, {
-        Id: order.id,
+      await ordersApi.update(currentOrder.id, {
+        Id: currentOrder.id,
         OrderType: values.OrderType.trim(),
         OrderDate: values.OrderDate,
         OrderStatus: values.OrderStatus,
@@ -451,7 +454,7 @@ export default function EditOrderDialog({
       });
 
       await Promise.all(
-        order.orderItems.map(async (item) => {
+        currentOrder.orderItems.map(async (item) => {
           const editedItem = currentItemsByInventoryId.get(item.inventoryItemId);
 
           if (!editedItem) {
@@ -462,7 +465,7 @@ export default function EditOrderDialog({
           if (editedItem.quantity !== item.quantity) {
             await ordersApi.updateItem(item.id, {
               Id: item.id,
-              OrderId: order.id,
+              OrderId: currentOrder.id,
               InventoryItemId: item.inventoryItemId,
               Quantity: editedItem.quantity,
             });
@@ -475,7 +478,7 @@ export default function EditOrderDialog({
           .filter((item) => !originalItemsByInventoryId.has(item.inventoryItemId))
           .map((item) =>
             ordersApi.createItem({
-              OrderId: order.id,
+              OrderId: currentOrder.id,
               InventoryItemId: item.inventoryItemId,
               Quantity: item.quantity,
             }),
@@ -483,7 +486,7 @@ export default function EditOrderDialog({
       );
 
       const inventoryIds = new Set<string>([
-        ...order.orderItems.map((item) => item.inventoryItemId),
+        ...currentOrder.orderItems.map((item) => item.inventoryItemId),
         ...addedItems.map((item) => item.inventoryItemId),
       ]);
 

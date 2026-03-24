@@ -1,9 +1,22 @@
 "use client";
 
-import { Box, Input, Select, Option, Button, Typography } from "@mui/joy";
-import { useState, useEffect } from "react";
+import {
+  Box,
+  Input,
+  Select,
+  Option,
+  Button,
+  Typography,
+  IconButton,
+} from "@mui/joy";
+import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
+import VisibilityOffRounded from "@mui/icons-material/VisibilityOffRounded";
+import { useState } from "react";
 import { Person, type BackendRoleName } from "../PeopleTable";
 import { validateUser, ValidationErrors, UserFormInput } from "@/validation/user.validation";
+
+/** Create includes initial password; edit never sends password from this form */
+export type PersonFormSubmitData = Partial<Person> & { password?: string };
 
 interface Props {
   mode: "create" | "edit";
@@ -14,7 +27,7 @@ interface Props {
   departments: { id: string; name: string }[];
   /** Only roles that exist in DB (from GET /api/role/list) */
   availableRoles: { role: Person["role"]; label: string }[];
-  onSubmit: (data: Partial<Person>) => void;
+  onSubmit: (data: PersonFormSubmitData) => void;
 }
 
 export function PersonForm({
@@ -32,6 +45,8 @@ export function PersonForm({
     lastName: string;
     email: string;
     username: string;
+    password: string;
+    confirmPassword: string;
     role: Person["role"];
     department: string;
     status: Person["status"];
@@ -49,6 +64,8 @@ export function PersonForm({
       lastName: person?.lastName ?? "",
       email: person?.email ?? "",
       username,
+      password: "",
+      confirmPassword: "",
       role: person?.role ?? "staff",
       department,
       status: person?.status ?? "active",
@@ -57,6 +74,8 @@ export function PersonForm({
 
   const [errors, setErrors] =
   useState<ValidationErrors<UserFormInput>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const isEditing = mode === "edit";
   const isAdminTarget = person?.role === "admin";
@@ -99,12 +118,15 @@ export function PersonForm({
           isEditing &&
           !!person?.username?.trim() &&
           person.username.trim() !== person?.email?.trim();
-        const validation = validateUser(form, { requireUsername });
+        const validation = validateUser(form, {
+          requireUsername,
+          requirePassword: !isEditing,
+        });
         setErrors(validation);
 
         if (Object.keys(validation).length > 0) return;
 
-        onSubmit({
+        const payload: PersonFormSubmitData = {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email.trim().toLowerCase(),
@@ -112,7 +134,11 @@ export function PersonForm({
           role: form.role,
           department: form.department,
           status: form.status,
-        });
+        };
+        if (!isEditing) {
+          payload.password = form.password.trim();
+        }
+        onSubmit(payload);
       }}
       sx={{
         display: "flex",
@@ -171,6 +197,82 @@ export function PersonForm({
           {errors.username}
         </Typography>
       )}
+
+      {!isEditing ? (
+        <>
+          <Typography level="body-sm" sx={{ color: "text.secondary" }}>
+            Password
+          </Typography>
+          <Input
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            value={form.password}
+            error={!!errors.password}
+            autoComplete="new-password"
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            endDecorator={
+              <IconButton
+                variant="plain"
+                size="sm"
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <VisibilityOffRounded fontSize="small" />
+                ) : (
+                  <VisibilityRounded fontSize="small" />
+                )}
+              </IconButton>
+            }
+          />
+          {errors.password ? (
+            <Typography level="body-xs" color="danger">
+              {errors.password}
+            </Typography>
+          ) : (
+            <Typography level="body-xs" sx={{ color: "text.tertiary" }}>
+              8+ chars, upper and lower case, number, special character.
+            </Typography>
+          )}
+          <Input
+            type={showConfirmPassword ? "text" : "password"}
+            placeholder="Confirm password"
+            value={form.confirmPassword}
+            error={!!errors.confirmPassword}
+            autoComplete="new-password"
+            onChange={(e) =>
+              setForm({ ...form, confirmPassword: e.target.value })
+            }
+            endDecorator={
+              <IconButton
+                variant="plain"
+                size="sm"
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                aria-label={
+                  showConfirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
+              >
+                {showConfirmPassword ? (
+                  <VisibilityOffRounded fontSize="small" />
+                ) : (
+                  <VisibilityRounded fontSize="small" />
+                )}
+              </IconButton>
+            }
+          />
+          {errors.confirmPassword && (
+            <Typography level="body-xs" color="danger">
+              {errors.confirmPassword}
+            </Typography>
+          )}
+        </>
+      ) : null}
 
       {/* Role / Department / Status */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>

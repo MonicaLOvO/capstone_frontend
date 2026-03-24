@@ -450,7 +450,7 @@ export default function PeoplePage() {
                 LastName: data.lastName,
                 Email: data.email,
                 Username: data.username?.trim() || data.email,
-                Password: "Temp123",
+                Password: data.password,
                 RoleId: data.role ? roleIdMap[data.role] : undefined,
                 DepartmentId: getDepartmentId(data.department),
                 IsActive: data.status === "active",

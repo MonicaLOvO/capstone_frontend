@@ -26,11 +26,13 @@ export function DepartmentDialog({
   initial,
   onClose,
   onSubmit,
+  submitError,
 }: {
   open: boolean;
   initial?: DepartmentForm | null;
   onClose: () => void;
   onSubmit: (data: DepartmentForm) => Promise<void>;
+  submitError?: string | null;
 }) {
   const [form, setForm] = useState<DepartmentForm>(() => ({
     name: initial?.name ?? "",
@@ -69,6 +71,11 @@ export function DepartmentDialog({
 
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {submitError ? (
+              <Typography level="body-sm" color="danger">
+                {submitError}
+              </Typography>
+            ) : null}
             <FormControl required>
               <FormLabel>Department Name</FormLabel>
               <Input

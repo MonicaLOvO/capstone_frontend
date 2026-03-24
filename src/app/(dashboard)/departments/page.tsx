@@ -27,6 +27,29 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { Chip } from "@mui/joy";
 import { useAuth } from "@/auth/AuthProvider";
 
+function getDepartmentSaveErrorMessage(error: unknown): string {
+  const fallback = "Failed to save department. Please try again.";
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (!message) return fallback;
+
+  const normalized = message.toLowerCase();
+  const nameConflict =
+    (normalized.includes("department") && normalized.includes("exist")) ||
+    (normalized.includes("department") && normalized.includes("duplicate")) ||
+    (normalized.includes("department") && normalized.includes("unique")) ||
+    normalized.includes("ix_depart");
+
+  if (nameConflict) {
+    return "Department name already exists. Use a different name.";
+  }
+
+  if (normalized === "request failed (500)") {
+    return "Could not save department due to a server conflict. The department name may already exist.";
+  }
+
+  return message;
+}
+
 export default function DepartmentsPage() {
   const router = useRouter();
   const { role } = useAuth();
@@ -36,6 +59,7 @@ export default function DepartmentsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ApiDepartment | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState<ApiDepartment | null>(null);
@@ -96,6 +120,7 @@ export default function DepartmentsPage() {
           sx={{ mt: { xs: 1, md: 0 } }}
           onClick={() => {
             setEditing(null);
+            setSubmitError(null);
             setDialogOpen(true);
           }}
         >
@@ -183,6 +208,7 @@ export default function DepartmentsPage() {
                       <MenuItem
                         onClick={() => {
                           setEditing(d);
+                          setSubmitError(null);
                           setDialogOpen(true);
                         }}
                       >
@@ -232,27 +258,32 @@ export default function DepartmentsPage() {
               }
             : null
         }
-        onClose={() => setDialogOpen(false)}
+        submitError={submitError}
+        onClose={() => {
+          setDialogOpen(false);
+          setSubmitError(null);
+        }}
         onSubmit={async (data) => {
-          if (editing) {
-            await departmentsApi.update(editing.Id, {
-              DepartmentName: data.name,
-              Description: data.description,
-            });
-          } else {
-            try {
+          setSubmitError(null);
+          try {
+            if (editing) {
+              await departmentsApi.update(editing.Id, {
+                DepartmentName: data.name,
+                Description: data.description,
+              });
+            } else {
               await departmentsApi.create({
                 DepartmentName: data.name,
                 Description: data.description,
               });
-            } catch (e) {
-              console.error("Create department failed:", e);
             }
-          }
 
-          await loadDepartments();
-          setDialogOpen(false);
-          setEditing(null);
+            await loadDepartments();
+            setDialogOpen(false);
+            setEditing(null);
+          } catch (err) {
+            setSubmitError(getDepartmentSaveErrorMessage(err));
+          }
         }}
       />
 

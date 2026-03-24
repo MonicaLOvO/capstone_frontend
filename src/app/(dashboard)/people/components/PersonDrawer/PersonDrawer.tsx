@@ -3,7 +3,7 @@
 import { Drawer, Box, Typography, IconButton, Alert } from "@mui/joy";
 import CloseIcon from "@mui/icons-material/Close";
 import { Person, type BackendRoleName } from "../PeopleTable";
-import { PersonForm } from "./PersonForm";
+import { PersonForm, type PersonFormSubmitData } from "./PersonForm";
 
 interface Props {
   open: boolean;
@@ -16,7 +16,7 @@ interface Props {
   /** Only roles that exist in DB (from GET /api/role/list) */
   availableRoles: { role: Person["role"]; label: string }[];
   onClose: () => void;
-  onSubmit: (data: Partial<Person>) => void;
+  onSubmit: (data: PersonFormSubmitData) => void | Promise<void>;
   /** Shown when API (create/update) fails */
   submitError?: string | null;
 }

@@ -22,6 +22,40 @@ import { rolesApi } from "@/services/api/roles/roles.api";
 import { departmentsApi } from "@/services/api/departments/departments.api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
+function getUserSaveErrorMessage(error: unknown): string {
+  const fallback = "Failed to save user. Please try again.";
+  const message = error instanceof Error ? error.message.trim() : "";
+
+  if (!message) return fallback;
+
+  const normalized = message.toLowerCase();
+
+  const emailConflict =
+    (normalized.includes("email") && normalized.includes("exist")) ||
+    (normalized.includes("email") && normalized.includes("duplicate")) ||
+    (normalized.includes("email") && normalized.includes("unique")) ||
+    normalized.includes("ix_users_email");
+
+  if (emailConflict) {
+    return "Email already exists. Use a different email address.";
+  }
+
+  const usernameConflict =
+    (normalized.includes("username") && normalized.includes("exist")) ||
+    (normalized.includes("username") && normalized.includes("duplicate")) ||
+    (normalized.includes("username") && normalized.includes("unique"));
+
+  if (usernameConflict) {
+    return "Username already exists. Choose a different username.";
+  }
+
+  if (normalized === "request failed (500)") {
+    return "Could not save user due to a server conflict. The email or username may already exist.";
+  }
+
+  return message;
+}
+
 export default function PeoplePage() {
   const { user, role, backendRoleName } = useAuth();
   const effectiveRole = role ?? "staff";
@@ -416,7 +450,7 @@ export default function PeoplePage() {
                 LastName: data.lastName,
                 Email: data.email,
                 Username: data.username?.trim() || data.email,
-                Password: "Temp123",
+                Password: data.password,
                 RoleId: data.role ? roleIdMap[data.role] : undefined,
                 DepartmentId: getDepartmentId(data.department),
                 IsActive: data.status === "active",
@@ -426,9 +460,7 @@ export default function PeoplePage() {
             setDrawerOpen(false);
             setEditingPerson(null);
           } catch (err) {
-            setSubmitError(
-              err instanceof Error ? err.message : "Failed to save user. Please try again."
-            );
+            setSubmitError(getUserSaveErrorMessage(err));
           }
         }}
       />

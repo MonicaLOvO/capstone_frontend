@@ -1,3 +1,5 @@
+// Create order dialog:
+// collects new order details, lets users attach inventory items, and submits the new order payload.
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -43,6 +45,7 @@ type AddedOrderItem = {
   unitPrice: number;
 };
 
+// Formats a value for date input fields used by the form.
 function toDateInput(value?: string | Date) {
   if (!value) return "";
   const date = typeof value === "string" ? new Date(value) : value;
@@ -50,10 +53,12 @@ function toDateInput(value?: string | Date) {
   return date.toISOString().slice(0, 10);
 }
 
+// Returns today's date in the format expected by date inputs.
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Builds the initial form state for a new order.
 function toFormValues(initial?: Partial<UpsertOrderDTO> | null): OrderFormValues {
   return {
     OrderType: String(initial?.OrderType ?? ""),
@@ -63,10 +68,12 @@ function toFormValues(initial?: Partial<UpsertOrderDTO> | null): OrderFormValues
   };
 }
 
+// Checks whether a text field contains a meaningful value.
 function isNonEmpty(s: string) {
   return s.trim().length > 0;
 }
 
+// Formats currency totals for inventory rows and the order summary.
 function formatMoney(value: number) {
   return `$${value.toFixed(2)}`;
 }
@@ -82,6 +89,7 @@ export function OrderDialog({
   onSubmit: (payload: UpsertOrderDTO) => Promise<void>;
   submitting: boolean;
 }) {
+  // Form state covers order details, inventory search, and selected order items.
   const [values, setValues] = useState<OrderFormValues>(() => toFormValues());
   const [inventorySearch, setInventorySearch] = useState("");
   const debouncedInventorySearch = useDebouncedValue(inventorySearch, 350);
@@ -96,6 +104,7 @@ export function OrderDialog({
   const orderTotal = addedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   useEffect(() => {
+    // Reset the dialog every time it opens so each new order starts clean.
     if (open) {
       setValues(toFormValues());
       setInventorySearch("");
@@ -111,6 +120,7 @@ export function OrderDialog({
   }, [open]);
 
   useEffect(() => {
+    // Search inventory as the user types so they can attach items to the order.
     if (!open) return;
     let cancelled = false;
 
@@ -144,12 +154,15 @@ export function OrderDialog({
     };
   }, [debouncedInventorySearch, open]);
 
+  // Updates one form field and clears any prior validation error for it.
   const setField = (key: keyof OrderFormValues, val: string) => {
     setValues((prev) => ({ ...prev, [key]: val }));
     setErrors((prev) => ({ ...prev, [key]: "" }));
   };
 
+  // Increments or decrements an added item's quantity within available stock.
   function changeAddedQuantity(inventoryItemId: string, delta: number) {
+    // Quantity changes are capped by what is currently available in stock.
     setAddedItems((prev) =>
       prev.flatMap((item) => {
         if (item.inventoryItemId !== inventoryItemId) return [item];
@@ -167,6 +180,7 @@ export function OrderDialog({
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
+  // Restricts addable results to inventory that is currently available for ordering.
   function canAddItem(item: InventoryItem) {
     return (
       (item.status === InventoryItemStatusEnum.InStock || item.status === InventoryItemStatusEnum.LowStock) &&
@@ -174,7 +188,9 @@ export function OrderDialog({
     );
   }
 
+  // Adds a searched inventory item into the pending order list.
   function addItem(item: InventoryItem) {
+    // Re-adding an existing item increases its quantity instead of duplicating the row.
     if (!canAddItem(item)) return;
 
     setAddedItems((prev) => {
@@ -208,11 +224,14 @@ export function OrderDialog({
     setErrors((prev) => ({ ...prev, OrderItems: "" }));
   }
 
+  // Removes one inventory item from the pending order.
   function removeItem(inventoryItemId: string) {
     setAddedItems((prev) => prev.filter((x) => x.inventoryItemId !== inventoryItemId));
   }
 
+  // Validates the order form before confirmation.
   function validate(v: OrderFormValues) {
+    // Orders must have basic metadata plus at least one attached inventory item.
     const next: Record<string, string> = {};
     if (!isNonEmpty(v.OrderType)) next.OrderType = "Order type is required";
     if (!isNonEmpty(v.OrderDate)) next.OrderDate = "Order date is required";
@@ -221,7 +240,9 @@ export function OrderDialog({
     return next;
   }
 
+  // Submits the finished order payload to the parent page.
   async function handleSubmit() {
+    // Build the backend payload from form state and selected inventory rows.
     const nextErrors = validate(values);
     setErrors(nextErrors);
     setApiError(null);
@@ -247,6 +268,7 @@ export function OrderDialog({
     }
   }
 
+  // Opens the add confirmation modal once validation passes.
   function requestSubmitConfirmation() {
     const nextErrors = validate(values);
     setErrors(nextErrors);
@@ -255,6 +277,7 @@ export function OrderDialog({
     setConfirmAddOpen(true);
   }
 
+  // Opens the cancel confirmation modal before discarding work.
   function requestCancelConfirmation() {
     setConfirmCancelOpen(true);
   }
@@ -280,6 +303,7 @@ export function OrderDialog({
 
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {/* Inline API errors appear above the form so they are hard to miss. */}
             {apiError ? (
               <Typography level="body-sm" color="danger">
                 {apiError}
@@ -287,6 +311,7 @@ export function OrderDialog({
             ) : null}
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              {/* Primary order fields live at the top for quick entry. */}
               <FormControl error={Boolean(errors.OrderType)} sx={{ flex: 1 }}>
                 <FormLabel>Order Type</FormLabel>
                 <Input
@@ -307,12 +332,15 @@ export function OrderDialog({
                 >
                   <Option value={OrderStatusEnum.Pending}>Pending</Option>
                   <Option value={OrderStatusEnum.Processing}>Processing</Option>
+                  <Option value={OrderStatusEnum.Cancelled}>Cancelled</Option>
+                  <Option value={OrderStatusEnum.Completed}>Completed</Option>
                 </Select>
                 {errors.OrderStatus ? <FormHelperText>{errors.OrderStatus}</FormHelperText> : null}
               </FormControl>
             </Stack>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              {/* Date fields are kept together because they are commonly edited as a pair. */}
               <FormControl error={Boolean(errors.OrderDate)} sx={{ flex: 1 }}>
                 <FormLabel>Order Date</FormLabel>
                 <Input
@@ -334,6 +362,7 @@ export function OrderDialog({
             </Stack>
 
             <Stack spacing={1}>
+              {/* Inventory search lets the user pull items into the order before saving. */}
               <Typography level="title-sm">Search Inventory Item</Typography>
               <Input
                 value={inventorySearch}
@@ -397,6 +426,7 @@ export function OrderDialog({
             </Stack>
 
             <Stack spacing={1}>
+              {/* This list is the pending contents of the order being created. */}
               <Typography level="title-sm">Items Added to Order</Typography>
               {addedItems.length === 0 ? (
                 <Typography level="body-sm" sx={{ color: "text.tertiary" }}>
@@ -492,7 +522,9 @@ export function OrderDialog({
       </ModalDialog>
 
     </Modal>
+      {/* Confirmation modal shown before the order is actually created. */}
       <Modal open={confirmAddOpen} onClose={() => setConfirmAddOpen(false)}>
+        {/* Confirm before finalizing the order and adjusting inventory. */}
         <ModalDialog size="sm">
           <DialogTitle>Confirm Order</DialogTitle>
           <DialogContent>
@@ -518,7 +550,9 @@ export function OrderDialog({
         </ModalDialog>
       </Modal>
 
+      {/* Confirmation modal shown before the draft order is discarded. */}
       <Modal open={confirmCancelOpen} onClose={() => setConfirmCancelOpen(false)}>
+        {/* Confirm before discarding the in-progress order. */}
         <ModalDialog size="sm">
           <DialogTitle>Discard Order?</DialogTitle>
           <DialogContent>

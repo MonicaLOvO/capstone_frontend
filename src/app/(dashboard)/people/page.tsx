@@ -456,11 +456,19 @@ export default function PeoplePage() {
                 IsActive: data.status === "active",
               });
             }
+          } catch (err) {
+            setSubmitError(getUserSaveErrorMessage(err));
+            return;
+          }
+
+          try {
             await loadUsers();
             setDrawerOpen(false);
             setEditingPerson(null);
-          } catch (err) {
-            setSubmitError(getUserSaveErrorMessage(err));
+          } catch {
+            setSubmitError(
+              "User saved successfully, but we could not refresh the list. Please refresh the page.",
+            );
           }
         }}
       />

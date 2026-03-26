@@ -131,7 +131,7 @@ export default function InventoryPage() {
           x.category?.toLowerCase().includes(term) ||
           x.location?.toLowerCase().includes(term)
       );
-    }
+    }// if there is a search term, we filter the items to only include those where the product name, SKU, category, or location includes the search term (case-insensitive). This allows the user to quickly find items by typing in any relevant keyword.
 
     if (category) data = data.filter((x) => x.category === category);
 

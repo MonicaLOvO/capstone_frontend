@@ -1,8 +1,4 @@
-//things missing:
-//Https
-//httpOnly cookies
-//rate limiting
-//login attempt protection (e.g., lockout after multiple failed attempts)
+
 "use client"; 
 // Tells Next.js this is a client-side component (runs in the browser)
 

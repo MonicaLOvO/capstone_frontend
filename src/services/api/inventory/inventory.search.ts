@@ -4,9 +4,8 @@ function dedupeById<T extends { id: string }>(arr: T[]): T[] {
   const map = new Map<string, T>();
   for (const x of arr) map.set(x.id, x);
   return Array.from(map.values());
-}
+} // removes duplicated items since we are searching by ProductName and SKU separately, but some items may match both
 
-// Since backend filters look exact, this gives a better UX:
 export async function searchInventory(params: {
   term: string;
   Page?: number;
@@ -18,7 +17,7 @@ export async function searchInventory(params: {
 }) {
   const { term, Page = 1, PageSize = 10, Category, Status, OrderColumn, OrderDirection } = params;
 
-  // if no search term, just list
+  // if no search term, return just list
   if (!term.trim()) {
     return inventoryApi.list({
       Page,
@@ -31,6 +30,7 @@ export async function searchInventory(params: {
   }
 
   // Search ProductName and SKU in parallel, then merge
+  // fire both api calls at the same time, then wait for both to finish. This is more efficient than doing them sequentially.
   const [byName, bySku] = await Promise.all([
     inventoryApi.list({
       Page,
@@ -52,7 +52,7 @@ export async function searchInventory(params: {
     }),
   ]);
 
-  const merged = dedupeById([...byName.items, ...bySku.items]);
+  const merged = dedupeById([...byName.items, ...bySku.items]); // merge and dedupe results
 
   // NOTE: pagination becomes “best effort” when merging two queries.
   // For a perfect solution, backend should support a single `q` search.

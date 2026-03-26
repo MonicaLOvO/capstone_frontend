@@ -15,7 +15,7 @@ export type InventoryItemDTO = {
   Category?: string | null;
   Location?: string | null;
   Sku?: string | null;
-  Status?: number | string | null; // backend sometimes returns "0"
+  Status?: number | string | null; // backend uses int, but keep as string to match enum values "0","2","5"
 };
 
 export type InventoryListQuery = {

@@ -5,13 +5,13 @@ import { mapInventoryItem, type InventoryItem } from "./inventory.mapper";
 
 function toQueryString(params: InventoryListQuery): string {
   const usp = new URLSearchParams();
-
+// only include params that have a value (skip undefined/null/empty)
   (Object.entries(params) as Array<[keyof InventoryListQuery, unknown]>).forEach(
     ([k, v]) => {
       if (v === undefined || v === null || v === "") return;
       usp.set(String(k), String(v));
     }
-  );
+  ); // object.entries returns [key, value] pairs, we filter out any pairs where value is undefined/null/empty, then add to URLSearchParams. This way we only include params that have a value, and skip any that are not set.
 
   const qs = usp.toString();
   return qs ? `?${qs}` : "";
@@ -22,7 +22,7 @@ export const inventoryApi = {
     const raw = (await http.raw<InventoryItemDTO[]>(
       `/api/inventory/list${toQueryString(query)}`
     )) as PagedApiResponse<InventoryItemDTO>;
-
+// we get back the raw DTOs from the API, but we want to return our mapped InventoryItem objects. So we map each DTO to an InventoryItem using our mapper function.
     return {
       items: raw.Data.map(mapInventoryItem),
       total: raw.Total,
@@ -30,7 +30,7 @@ export const inventoryApi = {
       pageSize: raw.PageSize,
       success: raw.Success,
       message: raw.Message,
-    };
+    };// we return the mapped items along with the pagination info and success/message from the API response.
   },
 
   async getById(id: string): Promise<InventoryItem> {

@@ -1,7 +1,7 @@
 import type { InventoryItemDTO } from "./inventory.types";
 
 export type InventoryItem = {
-  id: string;
+  id: string; 
   productName: string;
   description: string;
   quantity: number;

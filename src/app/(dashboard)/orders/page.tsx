@@ -201,8 +201,18 @@ export default function OrdersPage() {
               startDecorator={<SearchIcon />}
               value={search}
               onChange={(e) => {
-                setSearch(e.target.value);
+                // Remove symbols (allow only letters, numbers and spaces), then enforce max length.
+                const nextSearch = e.target.value
+                  .replace(/[^a-zA-Z0-9\s]/g, '')
+                  .slice(0, 50);
+                setSearch(nextSearch);
                 setPage(1);
+              }}
+              slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 50,
+                },
               }}
             />
           </FormControl>

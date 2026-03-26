@@ -318,6 +318,11 @@ export function OrderDialog({
                   value={values.OrderType}
                   onChange={(e) => setField("OrderType", e.target.value)}
                   placeholder="Sales, Restock..."
+                  slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 50,
+                },               }}
                 />
                 {errors.OrderType ? <FormHelperText>{errors.OrderType}</FormHelperText> : null}
               </FormControl>
@@ -368,6 +373,11 @@ export function OrderDialog({
                 value={inventorySearch}
                 onChange={(e) => setInventorySearch(e.target.value)}
                 placeholder="Search by product name or SKU"
+                slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 50,
+                },              }}
               />
 
               <Sheet variant="soft" sx={{ borderRadius: "sm", p: 1, maxHeight: 220, overflowY: "auto" }}>

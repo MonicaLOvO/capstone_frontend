@@ -27,7 +27,7 @@ const reportTypeLabels: Record<InventoryReportType, string> = {
 };
 
 // ── Your backend API base URL ──
-// TODO: Update this endpoint once your teammate creates it on the backend
+
 const API_ENDPOINT = "http://localhost:4000/api/inventory";
 
 // ── Today's date formatted as YYYY-MM-DD ──
@@ -36,7 +36,7 @@ const TODAY = new Date().toISOString().split("T")[0];
 // ── Empty form template ──
 const emptyForm = {
   ItemName: "",
-  reportedBy: "",           // auto-filled from logged-in user
+  reportedBy: "",           
   ReportType: "" as InventoryReportType | "",
   Description: "",
   AdditionalNotes: "",      // optional
@@ -50,6 +50,7 @@ export default function InventoryReportPage() {
   useEffect(() => {
   const loginAndStoreToken = async () => {
     try {
+      
       const res = await fetch("http://localhost:4000/api/user/login", {
         method: "POST",
         headers: {
@@ -77,12 +78,12 @@ export default function InventoryReportPage() {
 
         setCurrentUser(displayName);
 
-        console.log("✅ Auto login success");
+        console.log("Auto login success");
       } else {
-        console.error("❌ Login failed", data);
+        console.error("Login failed", data);
       }
     } catch (err) {
-      console.error("❌ Login error", err);
+      console.error(" Login error", err);
     }
   };
 
@@ -108,8 +109,20 @@ export default function InventoryReportPage() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.ItemName.trim())  newErrors.ItemName    = "Item name is required.";
+    else {
+      const itemNameWords = form.ItemName.trim().split(/\s+/).length;
+      if (itemNameWords > 50) newErrors.ItemName = "Item name cannot exceed 50 words.";
+    }
     if (!form.ReportType)       newErrors.ReportType  = "Please select a report type.";
     if (!form.Description.trim()) newErrors.Description = "Description is required.";
+    else {
+      const descWords = form.Description.trim().split(/\s+/).length;
+      if (descWords > 250) newErrors.Description = "Description cannot exceed 250 words.";
+    }
+    if (form.AdditionalNotes.trim()) {
+      const notesWords = form.AdditionalNotes.trim().split(/\s+/).length;
+      if (notesWords > 300) newErrors.AdditionalNotes = "Additional notes cannot exceed 300 words.";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0; // true = no errors
   };
@@ -128,7 +141,7 @@ export default function InventoryReportPage() {
       body: JSON.stringify({
         ProductName: form.ItemName,
 
-        // Combine your report data into Description (backend only supports this field)
+        
         Description: `
 Report Type: ${form.ReportType}
 Reported By: ${form.reportedBy}
@@ -231,6 +244,7 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               sx={{ width: "100%" }}
             />
             {errors.ItemName && <Typography level="body-xs" color="danger" mt={0.5}>{errors.ItemName}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 50 words</Typography>
           </Box>
 
           {/* Reported By — read-only, auto-filled from JWT user in localStorage */}
@@ -284,6 +298,7 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               sx={{ width: "100%", resize: "vertical" }}
             />
             {errors.Description && <Typography level="body-xs" color="danger" mt={0.5}>{errors.Description}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 250 words</Typography>
           </Box>
 
           {/* Additional Notes — optional */}
@@ -299,6 +314,8 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               maxRows={10}
               sx={{ width: "100%", resize: "vertical" }}
             />
+            {errors.AdditionalNotes && <Typography level="body-xs" color="danger" mt={0.5}>{errors.AdditionalNotes}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 300 words</Typography>
           </Box>
 
           {/* Submit + Clear buttons */}

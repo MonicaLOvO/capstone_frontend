@@ -12,7 +12,7 @@ import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlin
 import MedicalServicesRoundedIcon from "@mui/icons-material/MedicalServicesRounded";
 
 
-// TODO: Update this once your teammate creates the injury-reports endpoint
+// The injury-reports endpoint
 const API_ENDPOINT = "http://localhost:4000/api/injury-reports";
 
 // ── Today's date formatted as YYYY-MM-DD ──
@@ -65,12 +65,12 @@ export default function InjuryReportPage() {
 
           setCurrentUser(displayName);
 
-          console.log("✅ Auto login success");
+          console.log("Auto login success");
         } else {
-          console.error("❌ Login failed", data);
+          console.error("Login failed", data);
         }
       } catch (err) {
-        console.error("❌ Login error", err);
+        console.error(" Login error", err);
       }
     };
 
@@ -96,9 +96,25 @@ export default function InjuryReportPage() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.EmployeeName.trim()) newErrors.EmployeeName = "Employee name is required.";
+    else {
+      const employeeNameWords = form.EmployeeName.trim().split(/\s+/).length;
+      if (employeeNameWords > 50) newErrors.EmployeeName = "Employee name cannot exceed 50 words.";
+    }
     if (!form.InjuryType.trim())   newErrors.InjuryType   = "Injury type is required.";
+    else {
+      const injuryTypeWords = form.InjuryType.trim().split(/\s+/).length;
+      if (injuryTypeWords > 80) newErrors.InjuryType = "Injury type cannot exceed 80 words.";
+    }
     if (!form.Location.trim())     newErrors.Location     = "Location is required.";
+    else {
+      const locationWords = form.Location.trim().split(/\s+/).length;
+      if (locationWords > 100) newErrors.Location = "Location cannot exceed 100 words.";
+    }
     if (!form.Description.trim())  newErrors.Description  = "Description is required.";
+    else {
+      const descWords = form.Description.trim().split(/\s+/).length;
+      if (descWords > 300) newErrors.Description = "Description cannot exceed 300 words.";
+    }
     setErrors(newErrors);
     
     return Object.keys(newErrors).length === 0; // true = no errors
@@ -127,7 +143,7 @@ if (!token) {
       body: JSON.stringify({
         EmployeeName:    form.EmployeeName,
 
-        // ✅ MATCH INVENTORY STYLE (SAFE BACKEND FORMAT)
+        
         Description: `
 Employee: ${form.EmployeeName}
 Reported By: ${form.ReportedBy}
@@ -230,6 +246,7 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               sx={{ width: "100%" }}
             />
             {errors.EmployeeName && <Typography level="body-xs" color="danger" mt={0.5}>{errors.EmployeeName}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 50 words</Typography>
           </Box>
 
           {/* Reported By — read-only, auto-filled from login */}
@@ -277,6 +294,7 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               sx={{ width: "100%" }}
             />
             {errors.InjuryType && <Typography level="body-xs" color="danger" mt={0.5}>{errors.InjuryType}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 80 words</Typography>
           </Box>
 
           {/* Location */}
@@ -293,6 +311,7 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               sx={{ width: "100%" }}
             />
             {errors.Location && <Typography level="body-xs" color="danger" mt={0.5}>{errors.Location}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 100 words</Typography>
           </Box>
 
           {/* Description */}
@@ -310,6 +329,7 @@ Additional Notes: ${form.AdditionalNotes || "N/A"}
               sx={{ width: "100%", resize: "vertical" }}
             />
             {errors.Description && <Typography level="body-xs" color="danger" mt={0.5}>{errors.Description}</Typography>}
+            <Typography level="body-xs" textColor="text.tertiary" mt={0.5}>Max 300 words</Typography>
           </Box>
 
           {/* Witnesses — optional */}

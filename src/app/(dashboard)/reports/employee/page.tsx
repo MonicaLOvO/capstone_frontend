@@ -75,12 +75,12 @@ export default function EmployeeReportPage() {
 
           setCurrentUser(displayName);
 
-          console.log("✅ Auto login success");
+          console.log("Auto login success");
         } else {
-          console.error("❌ Login failed", data);
+          console.error("Login failed", data);
         }
       } catch (err) {
-        console.error("❌ Login error", err);
+        console.error(" Login error", err);
       }
     };
 

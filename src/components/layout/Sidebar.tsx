@@ -37,6 +37,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 
 import { navItems } from "@/config/navigation";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserProfileMedia } from "@/hooks/useUserProfileMedia";
 import { UserRole } from "@/types/roles";
 import { useAuth } from "@/auth/AuthProvider";
 import { clearAuthCookie } from "@/lib/authCookies";
@@ -102,6 +103,26 @@ export default function Sidebar({
   const router = useRouter();
 
   const { logout, user, backendRoleName } = useAuth();
+  const { avatarUrl, loadProfileMedia } = useUserProfileMedia(user?.id);
+
+  // Refetch avatar when user navigates or refocuses tab so sidebar updates after profile image change (no full refresh).
+  React.useEffect(() => {
+    void loadProfileMedia();
+  }, [pathname, loadProfileMedia]);
+
+  React.useEffect(() => {
+    const onFocus = () => void loadProfileMedia();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadProfileMedia]);
+
+  // Optional: profile page can dispatch this after upload for instant sidebar update: window.dispatchEvent(new CustomEvent('profile-media-updated'))
+  React.useEffect(() => {
+    const onProfileMediaUpdated = () => void loadProfileMedia();
+    window.addEventListener("profile-media-updated", onProfileMediaUpdated);
+    return () => window.removeEventListener("profile-media-updated", onProfileMediaUpdated);
+  }, [loadProfileMedia]);
+
   const roleLabel =
     backendRoleName === "SuperAdmin"
       ? "Super Admin"
@@ -275,7 +296,7 @@ export default function Sidebar({
             justifyContent: collapsed ? "center" : "flex-start",
           }}
         >
-          <Avatar size="sm" />
+          <Avatar size="sm" src={avatarUrl ?? undefined} alt="" />
 
           {!collapsed && (
             <Box>

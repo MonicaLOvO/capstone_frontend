@@ -1,3 +1,5 @@
+// Profile page:
+// shows the signed-in user's profile details and supports updating names and avatar media.
 'use client';
 
 import * as React from "react";
@@ -34,6 +36,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useUserProfileMedia } from "@/hooks/useUserProfileMedia";
 import { usersApi } from "@/services/api/users/users.api";
 
+// Renders the editable profile details form and save/cancel confirmations.
 function ProfileDetailsForm({
   userId,
   initialFirstName,
@@ -56,9 +59,11 @@ function ProfileDetailsForm({
   const [confirmSaveOpen, setConfirmSaveOpen] = React.useState(false);
   const [confirmCancelOpen, setConfirmCancelOpen] = React.useState(false);
 
+  // Detects whether the name fields differ from the current saved values.
   const isChanged =
     firstName !== initialFirstName || lastName !== initialLastName;
 
+  // Persists profile name changes through the current-user API.
   async function handleSave() {
     if (!userId) return;
 
@@ -82,6 +87,7 @@ function ProfileDetailsForm({
     }
   }
 
+  // Restores the original names and closes the cancel confirmation.
   function handleCancel() {
     setFirstName(initialFirstName);
     setLastName(initialLastName);
@@ -92,6 +98,7 @@ function ProfileDetailsForm({
   return (
     <>
       <Stack spacing={2} sx={{ flexGrow: 1, alignItems: "stretch" }}>
+        {/* Name fields are the only editable profile details on this form. */}
         <Stack spacing={1}>
           <FormLabel>Name</FormLabel>
 
@@ -102,6 +109,11 @@ function ProfileDetailsForm({
                 placeholder="First name"
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
+                slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 40,
+                },              }}
               />
             </FormControl>
 
@@ -111,12 +123,18 @@ function ProfileDetailsForm({
                 placeholder="Last name"
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
+                slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 40,
+                },              }}
               />
             </FormControl>
           </Stack>
         </Stack>
 
         <Stack direction="row" spacing={2}>
+          {/* Role and email are display-only account details. */}
           <FormControl>
             <FormLabel>Role</FormLabel>
             <Input size="sm" value={roleLabel} readOnly />
@@ -141,6 +159,8 @@ function ProfileDetailsForm({
         ) : null}
 
         {isChanged ? (
+          <>
+            {/* Action buttons only appear when the user has unsaved changes. */}
           <Stack
             direction="row"
             spacing={1.5}
@@ -165,9 +185,11 @@ function ProfileDetailsForm({
               Save
             </Button>
           </Stack>
+          </>
         ) : null}
       </Stack>
 
+      {/* Save confirmation prevents accidental profile updates. */}
       <Modal open={confirmSaveOpen} onClose={() => setConfirmSaveOpen(false)}>
         <ModalDialog size="sm">
           <DialogTitle>Confirm Save</DialogTitle>
@@ -194,6 +216,7 @@ function ProfileDetailsForm({
         </ModalDialog>
       </Modal>
 
+      {/* Cancel confirmation prevents accidental loss of form edits. */}
       <Modal open={confirmCancelOpen} onClose={() => setConfirmCancelOpen(false)}>
         <ModalDialog size="sm">
           <DialogTitle>Confirm Cancel</DialogTitle>
@@ -232,6 +255,7 @@ export default function ProfilePage() {
     ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
     : "";
 
+  // Uploads a new avatar image when the hidden file input changes.
   async function handleProfileImageSelected(
     event: React.ChangeEvent<HTMLInputElement>,
   ) {
@@ -242,11 +266,13 @@ export default function ProfilePage() {
 
     try {
       await uploadProfileMedia(file);
+      window.dispatchEvent(new CustomEvent("profile-media-updated"));
     } catch {}
   }
 
   return (
     <Box>
+      {/* Breadcrumbs keep the profile page aligned with dashboard navigation. */}
       <Breadcrumbs
         size="sm"
         separator={<ChevronRightRoundedIcon fontSize="small" />}
@@ -272,6 +298,7 @@ export default function ProfilePage() {
         My Profile
       </Typography>
 
+      {/* The profile card groups avatar controls and editable user details. */}
       <Sheet
         variant="outlined"
         sx={{
@@ -297,6 +324,7 @@ export default function ProfilePage() {
             sx={{ display: { xs: "none", md: "flex" }, my: 2 }}
           >
             <Stack direction="column" spacing={1}>
+              {/* Avatar preview falls back to the user's initial when no image exists. */}
               <AspectRatio
                 ratio="1"
                 maxHeight={200}
@@ -341,6 +369,7 @@ export default function ProfilePage() {
                   <EditRoundedIcon />
                 )}
               </IconButton>
+              {/* Hidden file input is triggered by the avatar edit button. */}
               <input
                 ref={fileInputRef}
                 type="file"

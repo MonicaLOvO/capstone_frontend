@@ -1,20 +1,21 @@
+// Orders page:
+// coordinates order search, filtering, pagination, and the create-order workflow.
 'use client';
 
 import { Box, Typography, Button, FormControl, Input, FormLabel, Select, Option, Breadcrumbs, Link, Stack } from '@mui/joy';
 import SearchIcon from '@mui/icons-material/Search';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import OrderTable from './components/OrderTable';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import { OrderDialog } from './components/OrderDialog';
 import { ordersApi } from '@/services/api/orders/orders.api';
-import type { UpsertOrderDTO } from '@/services/api/orders/orders.types';
+import { OrderStatusEnum, type UpsertOrderDTO } from '@/services/api/orders/orders.types';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { inventoryApi } from '@/services/api/inventory/inventory.api';
 import { InventoryItemStatusEnum } from '@/services/api/inventory/inventory.types';
-import router from 'next/router';
-import { useAuth } from '@/auth/AuthProvider';
 
+// Maps a quantity to the inventory status value expected by the backend.
 function getInventoryStatus(quantity: number): number {
   if (quantity <= 0) return Number(InventoryItemStatusEnum.OutStock);
   if (quantity <= 5) return Number(InventoryItemStatusEnum.LowStock);
@@ -22,22 +23,25 @@ function getInventoryStatus(quantity: number): number {
 }
 
 export default function OrdersPage() {
-  
+  // Page-level state for filters, pagination, and create-order workflow.
   const [page, setPage] = useState(1);
   const pageSize = 10;
-  const [statusFilter, setStatusFilter] = useState<'all' | '0' | '1'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | '0' | '1' | '4' | '6'>('all');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 350);
   const [createOpen, setCreateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Total count comes from the table so the page can render pagination controls.
   const [total, setTotal] = useState(0);
   const handleTotalChange = useCallback((nextTotal: number) => {
     setTotal(nextTotal);
   }, []);
 
+  // Creates an order and then decrements inventory for each selected item.
   async function handleCreate(payload: UpsertOrderDTO) {
+    // Creating an order also decrements the selected inventory quantities.
     setSubmitting(true);
     try {
       await ordersApi.create(payload);
@@ -77,42 +81,32 @@ export default function OrdersPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  // const { isAuthenticated } = useAuth();
 
-  // Check if user is logged in
-    // useEffect(() => {
-        // if (isAuthenticated) {
-            // router.replace('/(tabs)/home');
-        // }
-    // }, [isAuthenticated, router]);
-
-    
-
+  // Renders reusable filter controls for the orders toolbar.
   const renderFilters = () => (
     <React.Fragment>
       <FormControl size="sm">
-
-        {/* Status Filter */}
+        {/* Status filter drives the backend order list query. */}
         <FormLabel>Status</FormLabel>
         <Select
           size="sm"
           placeholder="All"
           value={statusFilter}
           onChange={(_, value) => {
-            const next = (value ?? 'all') as 'all' | '0' | '1';
+            const next = (value ?? 'all') as 'all' | '0' | '1' | '4' | '6';
             setStatusFilter(next);
             setPage(1);
           }}
           slotProps={{ button: { sx: { whiteSpace: 'nowrap' } } }}
         >
           <Option value="all">All</Option>
-          <Option value="1">Pending</Option>
-          <Option value="0">Processing</Option>
+          <Option value={OrderStatusEnum.Pending}>Pending</Option>
+          <Option value={OrderStatusEnum.Processing}>Processing</Option>
+          <Option value={OrderStatusEnum.Cancelled}>Cancelled</Option>
+          <Option value={OrderStatusEnum.Completed}>Completed</Option>
 
         </Select>
       </FormControl>
-      
-
     </React.Fragment>
   );
   
@@ -127,7 +121,7 @@ export default function OrdersPage() {
       }}
       >
 
-        {/* Page Path */}
+        {/* Breadcrumbs keep the orders page aligned with the dashboard nav. */}
 
         <Breadcrumbs
           size="sm"
@@ -156,7 +150,7 @@ export default function OrdersPage() {
               </Typography>
             </Breadcrumbs>
             
-        {/* Page Header */}
+        {/* Header actions cover export and opening the create-order dialog. */}
         <Box
           sx={{
             display: 'flex',
@@ -168,9 +162,12 @@ export default function OrdersPage() {
           <Typography level="h2">Orders</Typography>
 
           <Stack direction="row" spacing={1.5}>
-            <Button variant="solid" color="primary">
+
+            {/* Download PDF button (In Progress) */}
+
+            {/* <Button variant="solid" color="primary">
               Download PDF
-            </Button>
+            </Button> */}
 
             <Button color="primary" variant="solid" onClick={() => setCreateOpen(true)}>
               + Add Order
@@ -180,7 +177,7 @@ export default function OrdersPage() {
         </Box>
         
 
-        {/* Table Filters */}
+        {/* Search and filters feed the table component below. */}
 
         <Box
           className="SearchAndFilters-tabletUp"
@@ -204,15 +201,25 @@ export default function OrdersPage() {
               startDecorator={<SearchIcon />}
               value={search}
               onChange={(e) => {
-                setSearch(e.target.value);
+                // Remove symbols (allow only letters, numbers and spaces), then enforce max length.
+                const nextSearch = e.target.value
+                  .replace(/[^a-zA-Z0-9\s]/g, '')
+                  .slice(0, 50);
+                setSearch(nextSearch);
                 setPage(1);
+              }}
+              slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 50,
+                },
               }}
             />
           </FormControl>
 
           {renderFilters()}
         </Box>
-        {/* Table Container */}
+        {/* The table owns fetching, row actions, and the view/edit dialogs. */}
         
           <OrderTable
             key={refreshKey}
@@ -224,6 +231,7 @@ export default function OrdersPage() {
           />
       </Box>
 
+      {/* Pagination controls are kept outside the table so page state stays page-level. */}
        <Box
           sx={{
             px: 2,
@@ -258,7 +266,8 @@ export default function OrdersPage() {
           </Button>
         </Box>
 
-      <OrderDialog
+      {/* The create dialog is mounted here so page state controls refreshes after saves. */}
+       <OrderDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}

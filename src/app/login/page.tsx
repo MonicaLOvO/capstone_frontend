@@ -1,4 +1,6 @@
-"use client";
+
+"use client"; 
+// Tells Next.js this is a client-side component (runs in the browser)
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -7,17 +9,24 @@ import { setAuthCookie } from "@/lib/authCookies";
 
 export default function LoginPage() {
 
-  const router = useRouter();
-  const { login } = useAuth();
+  const router = useRouter(); 
+  // Used to navigate between pages (e.g., redirect after login)
 
+  const { login } = useAuth(); 
+  // Custom auth hook to manage authentication state globally
+
+  // State for user input fields
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // State for UI feedback
+  const [loading, setLoading] = useState(false); // shows loading state during login
+  const [error, setError] = useState<string | null>(null); // stores error messages
 
+  // Toggle password visibility (show/hide password)
   const [showPassword, setShowPassword] = useState(false);
 
+  // Function to validate input fields before sending request
   function validate() {
 
     if (!username.trim()) {
@@ -33,18 +42,20 @@ export default function LoginPage() {
     return true;
   }
 
+  // Function that handles form submission (login process)
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
 
-    e.preventDefault();
+    e.preventDefault(); // Prevent page reload
 
-    setError(null);
+    setError(null); // Clear previous errors
 
-    if (!validate()) return;
+    if (!validate()) return; // Stop if validation fails
 
-    setLoading(true);
+    setLoading(true); // Start loading state
 
     try {
 
+      // Send login request to backend API
       const res = await fetch("http://localhost:4000/api/user/login", {
         method: "POST",
         headers: {
@@ -56,26 +67,34 @@ export default function LoginPage() {
         })
       });
 
+      // If response is not successful, throw error
       if (!res.ok) {
         throw new Error("Invalid username or password");
       }
 
       const data = await res.json();
 
+      // Extract token from response
+      // token is used for authenticating future requests and maintaining user session
       const token: string | undefined = data?.Data?.token;
 
       if (!token) {
         throw new Error("Invalid login response");
       }
 
-      setAuthCookie(token);
+      setAuthCookie(token); 
+      // Store token in cookies (for persistence)
+      // This allows the user to stay logged in across page refreshes and sessions
 
-      await login(token);
+      await login(token); 
+      // Update global auth state
 
-      router.push("/dashboard");
+      router.push("/dashboard"); 
+      // Redirect user to dashboard after successful login
 
     } catch (err: unknown) {
 
+      // Handle errors
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -83,7 +102,7 @@ export default function LoginPage() {
       }
 
     } finally {
-      setLoading(false);
+      setLoading(false); // Stop loading state
     }
   }
 
@@ -91,6 +110,7 @@ export default function LoginPage() {
     <div style={styles.page}>
       <div style={styles.container}>
 
+        {/* Header section */}
         <div style={styles.header}>
           <h1 style={styles.title}>Sign in</h1>
           <p style={styles.subtitle}>
@@ -98,10 +118,13 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Display error message if exists */}
         {error && <div style={styles.error}>{error}</div>}
 
+        {/* Login form */}
         <form onSubmit={handleLogin}>
 
+          {/* Username input */}
           <label style={styles.label}>
             Username or Email
           </label>
@@ -114,19 +137,22 @@ export default function LoginPage() {
             style={styles.input}
           />
 
+          {/* Password input */}
           <label style={styles.label}>
             Password
           </label>
 
           <div style={{ position: "relative" }}>
             <input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? "text" : "password"} 
+              // Toggle between text/password
               placeholder="Enter password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={styles.input}
             />
 
+            {/* Show/Hide password button */}
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -136,6 +162,7 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {/* Submit button */}
           <button
             type="submit"
             disabled={loading}
@@ -146,6 +173,7 @@ export default function LoginPage() {
 
         </form>
 
+        {/* Footer */}
         <div style={styles.footer}>
           Secure system access
         </div>
@@ -155,8 +183,10 @@ export default function LoginPage() {
   );
 }
 
+// Styling object for the page (inline CSS styles)
 const styles: Record<string, React.CSSProperties> = {
 
+  // Full page layout
   page: {
     minHeight: "100vh",
     display: "flex",
@@ -166,6 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "20px"
   },
 
+  // Main login card container
   container: {
     width: "100%",
     maxWidth: "420px",
@@ -175,20 +206,24 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)"
   },
 
+  // Header section spacing
   header: {
     marginBottom: "24px"
   },
 
+  // Title styling
   title: {
     fontSize: "26px",
     marginBottom: "6px"
   },
 
+  // Subtitle styling
   subtitle: {
     fontSize: "14px",
     color: "#64748b"
   },
 
+  // Label for inputs
   label: {
     fontSize: "14px",
     fontWeight: 500,
@@ -196,6 +231,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "6px"
   },
 
+  // Input field styling
   input: {
     width: "100%",
     padding: "12px",
@@ -208,6 +244,7 @@ const styles: Record<string, React.CSSProperties> = {
     outline: "none"
   },
 
+  // Show/hide password button styling
   showBtn: {
     position: "absolute",
     right: "10px",
@@ -219,6 +256,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "13px"
   },
 
+  // Submit button styling
   button: {
     width: "100%",
     height: "44px",
@@ -230,6 +268,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer"
   },
 
+  // Footer text styling
   footer: {
     marginTop: "20px",
     textAlign: "center",
@@ -237,6 +276,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#94a3b8"
   },
 
+  // Error message styling
   error: {
     background: "#fee2e2",
     color: "#991b1b",

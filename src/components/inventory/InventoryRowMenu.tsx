@@ -15,13 +15,13 @@ export function InventoryRowMenu({
 }: {
   onEdit: () => void;
   onQr: () => void;
-  onDelete: () => void;
+  onDelete: () => void; //accepts three functions as props, which will be called when the corresponding menu item is clicked. This allows the parent component (inventory page) to define what happens when the user clicks "Edit", "QR Code", or "Delete" for a specific inventory item.
 }) {
   return (
     <Dropdown>
       {/* Three-dot trigger button */}
       <MenuButton
-        slots={{ root: IconButton }}
+        slots={{ root: IconButton }} // use IconButton for the trigger to get the circular ripple effect
         slotProps={{
           root: {
             variant: "soft",

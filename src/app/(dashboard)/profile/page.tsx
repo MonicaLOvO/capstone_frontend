@@ -109,6 +109,11 @@ function ProfileDetailsForm({
                 placeholder="First name"
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
+                slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 40,
+                },              }}
               />
             </FormControl>
 
@@ -118,6 +123,11 @@ function ProfileDetailsForm({
                 placeholder="Last name"
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
+                slotProps={{
+                input: {
+                  minLength: 1,
+                  maxLength: 40,
+                },              }}
               />
             </FormControl>
           </Stack>

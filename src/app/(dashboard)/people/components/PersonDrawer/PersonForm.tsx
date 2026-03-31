@@ -11,7 +11,7 @@ import {
 } from "@mui/joy";
 import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRounded from "@mui/icons-material/VisibilityOffRounded";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Person, type BackendRoleName } from "../PeopleTable";
 import { validateUser, ValidationErrors, UserFormInput } from "@/validation/user.validation";
 
@@ -72,10 +72,10 @@ export function PersonForm({
     };
   });
 
-  const [errors, setErrors] =
-  useState<ValidationErrors<UserFormInput>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [touched, setTouched] = useState<Partial<Record<keyof UserFormInput, boolean>>>({});
 
   const isEditing = mode === "edit";
   const isAdminTarget = person?.role === "admin";
@@ -83,6 +83,34 @@ export function PersonForm({
   const isSuperAdmin = currentUserBackendRole === "SuperAdmin";
   const disableRoleAndStatusForTarget =
     isAdminTarget && !isSuperAdmin;
+
+  const requireUsername =
+    isEditing &&
+    !!person?.username?.trim() &&
+    person.username.trim() !== person?.email?.trim();
+
+  const validation = useMemo(
+    () =>
+      validateUser(form, {
+        requireUsername,
+        requirePassword: !isEditing,
+      }),
+    [form, requireUsername, isEditing],
+  );
+
+  const visibleErrors = useMemo(() => {
+    if (hasSubmitted) return validation;
+    const next: ValidationErrors<UserFormInput> = {};
+    (Object.keys(validation) as (keyof UserFormInput)[]).forEach((key) => {
+      if (touched[key]) next[key] = validation[key];
+    });
+    return next;
+  }, [validation, touched, hasSubmitted]);
+
+  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setTouched((prev) => ({ ...prev, [key]: true }));
+  };
 
   // In edit mode: if user already has a department, don't allow changing to "No Department"
   const hasExistingDepartment =
@@ -113,16 +141,7 @@ export function PersonForm({
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-
-        const requireUsername =
-          isEditing &&
-          !!person?.username?.trim() &&
-          person.username.trim() !== person?.email?.trim();
-        const validation = validateUser(form, {
-          requireUsername,
-          requirePassword: !isEditing,
-        });
-        setErrors(validation);
+        setHasSubmitted(true);
 
         if (Object.keys(validation).length > 0) return;
 
@@ -150,25 +169,25 @@ export function PersonForm({
       <Input
         placeholder="First Name"
         value={form.firstName}
-        error={!!errors.firstName}
-        onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+        error={!!visibleErrors.firstName}
+        onChange={(e) => setField("firstName", e.target.value)}
       />
-      {errors.firstName && (
+      {visibleErrors.firstName && (
         <Typography level="body-xs" color="danger">
-          {errors.firstName}
+          {visibleErrors.firstName}
         </Typography>
       )}
 
       <Input
         placeholder="Last name"
         value={form.lastName}
-        error={!!errors.lastName}
-        onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+        error={!!visibleErrors.lastName}
+        onChange={(e) => setField("lastName", e.target.value)}
         required
       />
-      {errors.lastName && (
+      {visibleErrors.lastName && (
         <Typography level="body-xs" color="danger">
-          {errors.lastName}
+          {visibleErrors.lastName}
         </Typography>
       )}
 
@@ -176,25 +195,25 @@ export function PersonForm({
         type="email"
         placeholder="Email"
         value={form.email}
-        error={!!errors.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
+        error={!!visibleErrors.email}
+        onChange={(e) => setField("email", e.target.value)}
         required
       />
-      {errors.email && (
+      {visibleErrors.email && (
         <Typography level="body-xs" color="danger">
-          {errors.email}
+          {visibleErrors.email}
         </Typography>
       )}
       {/* (display in sidebar when logged in; blank = use email) */}
       <Input
         placeholder="Username (optional)"
         value={form.username}
-        error={!!errors.username}
-        onChange={(e) => setForm({ ...form, username: e.target.value })}
+        error={!!visibleErrors.username}
+        onChange={(e) => setField("username", e.target.value)}
       />
-      {errors.username && (
+      {visibleErrors.username && (
         <Typography level="body-xs" color="danger">
-          {errors.username}
+          {visibleErrors.username}
         </Typography>
       )}
 
@@ -207,9 +226,9 @@ export function PersonForm({
             type={showPassword ? "text" : "password"}
             placeholder="Password"
             value={form.password}
-            error={!!errors.password}
+            error={!!visibleErrors.password}
             autoComplete="new-password"
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            onChange={(e) => setField("password", e.target.value)}
             endDecorator={
               <IconButton
                 variant="plain"
@@ -227,9 +246,9 @@ export function PersonForm({
               </IconButton>
             }
           />
-          {errors.password ? (
+          {visibleErrors.password ? (
             <Typography level="body-xs" color="danger">
-              {errors.password}
+              {visibleErrors.password}
             </Typography>
           ) : (
             <Typography level="body-xs" sx={{ color: "text.tertiary" }}>
@@ -240,11 +259,9 @@ export function PersonForm({
             type={showConfirmPassword ? "text" : "password"}
             placeholder="Confirm password"
             value={form.confirmPassword}
-            error={!!errors.confirmPassword}
+            error={!!visibleErrors.confirmPassword}
             autoComplete="new-password"
-            onChange={(e) =>
-              setForm({ ...form, confirmPassword: e.target.value })
-            }
+            onChange={(e) => setField("confirmPassword", e.target.value)}
             endDecorator={
               <IconButton
                 variant="plain"
@@ -266,9 +283,9 @@ export function PersonForm({
               </IconButton>
             }
           />
-          {errors.confirmPassword && (
+          {visibleErrors.confirmPassword && (
             <Typography level="body-xs" color="danger">
-              {errors.confirmPassword}
+              {visibleErrors.confirmPassword}
             </Typography>
           )}
         </>

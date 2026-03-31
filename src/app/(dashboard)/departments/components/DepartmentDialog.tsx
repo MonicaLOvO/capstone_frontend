@@ -12,8 +12,7 @@ import {
   Stack,
   Typography,
 } from "@mui/joy";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useMemo, useState } from "react";
 import { validateDepartment, DepartmentInput } from "@/validation/department.validation";
 
 export interface DepartmentForm {
@@ -38,9 +37,26 @@ export function DepartmentDialog({
     name: initial?.name ?? "",
     description: initial?.description ?? "",
   }));
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [touched, setTouched] =
+    useState<Partial<Record<keyof DepartmentInput, boolean>>>({});
+  const validation = useMemo(() => validateDepartment(form), [form]);
+  const visibleErrors = useMemo(() => {
+    if (hasSubmitted) return validation;
+    const next: Partial<Record<keyof DepartmentInput, string>> = {};
+    (Object.keys(validation) as (keyof DepartmentInput)[]).forEach((key) => {
+      if (touched[key]) next[key] = validation[key];
+    });
+    return next;
+  }, [validation, touched, hasSubmitted]);
 
-  const [errors, setErrors] =
-  useState<Partial<Record<keyof DepartmentInput, string>>>({});
+  const setField = <K extends keyof DepartmentForm>(
+    key: K,
+    value: DepartmentForm[K],
+  ) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setTouched((prev) => ({ ...prev, [key]: true }));
+  };
 
   // IMPORTANT:
   // when dialog closes, React unmounts and remounts
@@ -81,34 +97,27 @@ export function DepartmentDialog({
               <Input
                 placeholder="e.g. IT, Sales, Warehouse"
                 value={form.name}
-                error={!!errors.name}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, name: e.target.value }))
-                }
+                error={!!visibleErrors.name}
+                onChange={(e) => setField("name", e.target.value)}
               />
-              {errors.name && (
+              {visibleErrors.name && (
                 <Typography level="body-xs" color="danger">
-                  {errors.name}
+                  {visibleErrors.name}
                 </Typography>
               )}
             </FormControl>
 
-            <FormControl error={!!errors.description}>
+            <FormControl error={!!visibleErrors.description}>
               <FormLabel>Description</FormLabel>
               <Input
                 placeholder="Optional description (max 200 characters)"
                 value={form.description}
-                error={!!errors.description}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    description: e.target.value,
-                  }))
-                }
+                error={!!visibleErrors.description}
+                onChange={(e) => setField("description", e.target.value)}
               />
-              {errors.description && (
+              {visibleErrors.description && (
                 <Typography level="body-xs" color="danger">
-                  {errors.description}
+                  {visibleErrors.description}
                 </Typography>
               )}
             </FormControl>
@@ -126,10 +135,7 @@ export function DepartmentDialog({
               <Button
                 color="primary"
                 onClick={() => {
-                  // if (!form.name.trim()) return;
-
-                  const validation = validateDepartment(form);
-                  setErrors(validation);
+                  setHasSubmitted(true);
 
                   if (Object.keys(validation).length > 0) return;
 

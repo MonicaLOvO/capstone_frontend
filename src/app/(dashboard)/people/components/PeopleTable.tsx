@@ -162,8 +162,8 @@ export function PeopleTable({
                           p.role === "admin"
                             ? "primary"
                             : p.role === "manager"
-                            ? "warning"
-                            : "neutral"
+                              ? "warning"
+                              : "neutral"
                         }
                         sx={{
                           minWidth: 80,
@@ -172,6 +172,17 @@ export function PeopleTable({
                           justifyContent: "center",
                           textTransform: "capitalize",
                           "& .MuiChip-label": { textAlign: "center" },
+                          // Light: keep soft neutral (filled gray) like Admin/Manager — not outlined white on white.
+                          // Dark: default neutral.soft is same as table surface — lift contrast only there.
+                          ...(p.role === "staff"
+                            ? {
+                                "html[data-joy-color-scheme='dark'] &": {
+                                  bgcolor: "rgba(255, 255, 255, 0.08)",
+                                  border: "1px solid rgba(255, 255, 255, 0.22)",
+                                  color: "var(--joy-palette-neutral-200)",
+                                },
+                              }
+                            : {}),
                         }}
                       >
                         {p.backendRoleName === "SuperAdmin"

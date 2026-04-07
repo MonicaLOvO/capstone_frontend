@@ -436,24 +436,55 @@ export function InventoryItemDialog({
     });
   }
 
-  // ── SKU keystroke filter ──────────────────────────────────────────────────
+  // ── SKU keystroke filter + auto-dash formatter ────────────────────────────
   /**
    * handleSkuChange()
-   * Processes every character the user types into the SKU field.
+   * Processes every character the user types into the SKU field and
+   * auto-inserts dashes at the correct positions so the user never has
+   * to type them manually.
    *
    * Steps:
    *  1. Force the value to uppercase (SKUs are always uppercase).
-   *  2. Strip any character that is NOT alphanumeric, dash, or underscore.
-   *     This prevents spaces, symbols (*, /, @, etc.) from ever appearing.
-   *  3. Enforce the 32-character hard ceiling.
+   *  2. Strip any character that is NOT alphanumeric or a dash (dashes are
+   *     kept here so we can detect whether the user is backspacing through
+   *     an auto-inserted one).
+   *  3. Remove ALL dashes to get just the raw alphanumeric segments.
+   *  4. Re-assemble with dashes injected at the correct positions:
+   *       - After the 4-char prefix  → "PROX-"
+   *       - After the 3-letter block → "PROX-ABC-"
+   *  5. Enforce the 32-character hard ceiling.
    *
-   * The regex /[^A-Z0-9\-_]/g matches every INVALID character and removes it.
-   * The "^" inside [] means "NOT these characters".
+   * Auto-dash behaviour:
+   *  User types "PROX"    → field shows "PROX-"
+   *  User types "PROXABC" → field shows "PROX-ABC-"
+   *  User types "PROXABC0001" → field shows "PROX-ABC-0001"
+   *
+   * Backspace works naturally: removing the last real character also causes
+   * the trailing auto-dash to disappear because the dash is only injected
+   * when the preceding segment is full.
    */
   function handleSkuChange(raw: string) {
-    const upper    = raw.toUpperCase();
-    const cleaned  = upper.replace(/[^A-Z0-9\-_]/g, ""); // strip invalid chars
-    const capped   = cleaned.slice(0, SKU_MAX_CHARS);     // enforce max length
+    const upper   = raw.toUpperCase();
+    const cleaned = upper.replace(/[^A-Z0-9]/g, ""); // strip everything except letters & digits
+
+    // Split the raw alphanumeric string into the three named segments:
+    //   seg1 → up to 4 chars  ("PROX")
+    //   seg2 → up to 3 chars  ("ABC")
+    //   seg3 → up to 4 chars  ("0001")
+    const seg1 = cleaned.slice(0, 4);
+    const seg2 = cleaned.slice(4, 7);
+    const seg3 = cleaned.slice(7, 11);
+
+    // Re-assemble with dashes injected automatically:
+    //   dash after seg1 only when seg1 is complete (4 chars)
+    //   dash after seg2 only when seg2 is complete (3 chars)
+    let formatted = seg1;
+    if (seg1.length === 4) formatted += "-";
+    if (seg2)              formatted += seg2;
+    if (seg2.length === 3) formatted += "-";
+    if (seg3)              formatted += seg3;
+
+    const capped = formatted.slice(0, SKU_MAX_CHARS);
     setField("Sku", capped);
   }
 
@@ -605,7 +636,7 @@ export function InventoryItemDialog({
                   }
                 </FormControl>
 
-                {/* SKU — filtered input, format PROX-XXX-0001 */}
+                {/* SKU — auto-formatted input, format PROX-XXX-0001 */}
                 <FormControl error={Boolean(errors.Sku)} sx={{ flex: 1 }}>
                   <FormLabel>SKU</FormLabel>
                   <Input
@@ -617,7 +648,7 @@ export function InventoryItemDialog({
                     ? <FormHelperText>{errors.Sku}</FormHelperText>
                     : (
                       <FormHelperText>
-                        Format: PROX-XXX-0001 · only A–Z, 0–9, dash, underscore
+                         Format: PROX-XXX-0001
                       </FormHelperText>
                     )
                   }
@@ -678,7 +709,6 @@ export function InventoryItemDialog({
                   {errors.Quantity
                     ? <FormHelperText>{errors.Quantity}</FormHelperText>
                     : <FormHelperText>
-                        Whole numbers only · Range: {QUANTITY_MIN}–{QUANTITY_MAX.toLocaleString()}
                       </FormHelperText>
                   }
                 </FormControl>
@@ -694,10 +724,7 @@ export function InventoryItemDialog({
                     // min=0 prevents the browser spinner from going below zero
                     slotProps={{ input: { min: 0, step: "0.01" } }}
                   />
-                  {errors.UnitPrice
-                    ? <FormHelperText>{errors.UnitPrice}</FormHelperText>
-                    : <FormHelperText>Cannot be negative</FormHelperText>
-                  }
+                  
                 </FormControl>
 
               </Stack>

@@ -123,7 +123,7 @@ export default function Sidebar({
     return () => window.removeEventListener("profile-media-updated", onProfileMediaUpdated);
   }, [loadProfileMedia]);
 
-  const roleLabel =
+  const roleLabel = 
     backendRoleName === "SuperAdmin"
       ? "Super Admin"
       : user?.role

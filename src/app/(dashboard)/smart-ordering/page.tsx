@@ -136,7 +136,7 @@ export default function SmartOrderingPage() {
         }}
       >
         <Input
-          placeholder="Search items, SKU, vendor"
+          placeholder="Search by item name or SKU"
           startDecorator={<SearchRounded />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}

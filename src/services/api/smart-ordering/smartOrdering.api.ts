@@ -75,12 +75,13 @@ function delay(ms: number) {
 }
 
 /**
- * Fetches AI reorder rows. Independent of Reports page — no merge required.
+ * Fetches AI reorder rows.
  *
- * Live integration (when ready):
- * - Add backend route (e.g. GET /api/smart-ordering/recommendations or team’s chosen path).
- * - Map response to SmartOrderingRow[] (handle PascalCase if needed).
- * - Set NEXT_PUBLIC_SMART_ORDERING_MOCK=false in .env.local
+ * - Default / `NEXT_PUBLIC_SMART_ORDERING_MOCK` unset or not `"false"`: mock data.
+ * - `NEXT_PUBLIC_SMART_ORDERING_MOCK=false`: Next.js Route Handler `POST /api/smart-ordering/generate`
+ *   (GitHub Models + `Agent.md`). Requires `GITHUB_TOKEN` in `.env.local` (server only).
+ * - Optional: `NEXT_PUBLIC_SMART_ORDERING_SOURCE=express` + mock false → capstone Express
+ *   `GET` `/api/smart-ordering/recommendations` (when backend implements it).
  */
 export async function getSmartOrderingRecommendations(): Promise<SmartOrderingRow[]> {
   const useMock =
@@ -92,21 +93,39 @@ export async function getSmartOrderingRecommendations(): Promise<SmartOrderingRo
     return MOCK_RECOMMENDATIONS;
   }
 
-  try {
-    const res = await http.raw<SmartOrderingRow[]>(
-      "/api/smart-ordering/recommendations",
-    );
-    if (res.Success && Array.isArray(res.Data)) {
-      return res.Data;
+  const source = process.env.NEXT_PUBLIC_SMART_ORDERING_SOURCE ?? "next";
+
+  if (source === "express") {
+    try {
+      const res = await http.raw<SmartOrderingRow[]>(
+        "/api/smart-ordering/recommendations",
+      );
+      if (res.Success && Array.isArray(res.Data)) {
+        return res.Data;
+      }
+      throw new Error(res.Message || "Failed to load recommendations");
+    } catch (e) {
+      console.warn(
+        "[smart-ordering] Express API failed; set NEXT_PUBLIC_SMART_ORDERING_MOCK=true or fix backend.",
+        e,
+      );
+      throw e;
     }
-    throw new Error(res.Message || "Failed to load recommendations");
-  } catch (e) {
-    console.warn(
-      "[smart-ordering] Live API failed; ensure endpoint exists or set NEXT_PUBLIC_SMART_ORDERING_MOCK=true",
-      e,
-    );
-    throw e;
   }
+
+  const res = await fetch("/api/smart-ordering/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const data = (await res.json()) as { rows?: SmartOrderingRow[]; error?: string };
+  if (!res.ok) {
+    throw new Error(data?.error || `AI route failed (${res.status})`);
+  }
+  if (!Array.isArray(data.rows)) {
+    throw new Error("Invalid response: missing rows array");
+  }
+  return data.rows;
 }
 
 /** For tests or Storybook */

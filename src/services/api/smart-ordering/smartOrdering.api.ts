@@ -1,3 +1,4 @@
+import { getToken } from "@/auth/token";
 import { http } from "@/services/api/http";
 import type { SmartOrderingRow } from "./smartOrdering.types";
 
@@ -80,6 +81,8 @@ function delay(ms: number) {
  * - Default / `NEXT_PUBLIC_SMART_ORDERING_MOCK` unset or not `"false"`: mock data.
  * - `NEXT_PUBLIC_SMART_ORDERING_MOCK=false`: Next.js Route Handler `POST /api/smart-ordering/generate`
  *   (GitHub Models + `Agent.md`). Requires `GITHUB_TOKEN` in `.env.local` (server only).
+ *   When the user is logged in, sends `Authorization: Bearer` so the route can load live inventory
+ *   from Express `GET /api/inventory/list` and ground the model on real DB rows.
  * - Optional: `NEXT_PUBLIC_SMART_ORDERING_SOURCE=express` + mock false → capstone Express
  *   `GET` `/api/smart-ordering/recommendations` (when backend implements it).
  */
@@ -113,9 +116,15 @@ export async function getSmartOrderingRecommendations(): Promise<SmartOrderingRo
     }
   }
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const jwt = getToken();
+  if (jwt) {
+    headers.Authorization = `Bearer ${jwt}`;
+  }
+
   const res = await fetch("/api/smart-ordering/generate", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({}),
   });
   const data = (await res.json()) as { rows?: SmartOrderingRow[]; error?: string };

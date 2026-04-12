@@ -3,6 +3,7 @@ import { AzureKeyCredential } from "@azure/core-auth";
 import { readFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
+import { fetchInventoryForPrompt } from "@/lib/smartOrdering/fetchInventoryForPrompt";
 import {
   extractJsonObject,
   mapAiItemToRow,
@@ -15,8 +16,8 @@ const model = "openai/gpt-4.1";
 
 export async function POST(request: Request) {
   try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) {
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken) {
       return NextResponse.json(
         { error: "Missing GITHUB_TOKEN environment variable." },
         { status: 500 },
@@ -24,20 +25,41 @@ export async function POST(request: Request) {
     }
 
     let extraInput = "";
+    let hasLiveInventory = false;
+    const authHeader = request.headers.get("authorization");
+
     try {
       const body = (await request.json()) as { inputData?: string };
-      if (typeof body?.inputData === "string" && body.inputData.trim()) {
+      if (authHeader?.trim()) {
+        const inv = await fetchInventoryForPrompt(authHeader);
+        if (!inv.ok) {
+          return NextResponse.json({ error: inv.message }, { status: inv.status });
+        }
+        extraInput = `\n\n## INPUT DATA\n${inv.text}\n`;
+        hasLiveInventory = true;
+      } else if (typeof body?.inputData === "string" && body.inputData.trim()) {
         extraInput = `\n\n## ADDITIONAL INPUT DATA\n${body.inputData.trim()}\n`;
       }
     } catch {
       /* empty body ok */
+      if (authHeader?.trim()) {
+        const inv = await fetchInventoryForPrompt(authHeader);
+        if (!inv.ok) {
+          return NextResponse.json({ error: inv.message }, { status: inv.status });
+        }
+        extraInput = `\n\n## INPUT DATA\n${inv.text}\n`;
+        hasLiveInventory = true;
+      }
     }
 
     const agentPath = path.join(process.cwd(), "src", "prompts", "Agent.md");
     const agentMarkdown = await readFile(agentPath, "utf-8");
-    const userPrompt = `${agentMarkdown}${extraInput}\n\nRespond with ONLY valid JSON matching the OUTPUT RULES (no markdown fences, no commentary). Use realistic sample inventory if INPUT DATA is empty. Include at least 3 recommendations.`;
+    const tailInstruction = hasLiveInventory
+      ? "Respond with ONLY valid JSON matching the OUTPUT RULES (no markdown fences, no commentary). Base every recommendation on the INPUT DATA inventory only: use real sku and item_name from the list. Where max_capacity or reorder context is missing, infer reasonable values from current_stock and category. Include at least 3 recommendations when there are at least 3 items; otherwise recommend for each item present."
+      : "Respond with ONLY valid JSON matching the OUTPUT RULES (no markdown fences, no commentary). Use realistic sample inventory if INPUT DATA is empty. Include at least 3 recommendations.";
+    const userPrompt = `${agentMarkdown}${extraInput}\n\n${tailInstruction}`;
 
-    const client = ModelClient(endpoint, new AzureKeyCredential(token));
+    const client = ModelClient(endpoint, new AzureKeyCredential(githubToken));
     const response = await client.path("/chat/completions").post({
       body: {
         messages: [

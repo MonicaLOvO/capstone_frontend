@@ -1,13 +1,53 @@
 /**
  * Server-only: loads inventory + order line history from Express for Smart ordering AI.
  * Order fetch failures are non-fatal (inventory-only prompt).
+ *
+ * Env (optional):
+ * - SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true — do not call GET /api/orderItem/list/{id};
+ *   use only OrderItems embedded on each order from GET /api/order/list (if any). Fastest path
+ *   when the list endpoint does not include line items (inventory-only demand context).
  */
 
 const INVENTORY_PAGE_SIZE = 500;
 const ORDER_LIST_PAGE_SIZE = 100;
-const MAX_ORDERS_FOR_LINE_FETCH = 40;
+/** Cap how many parent orders we expand into line items (keeps generate route responsive). */
+const MAX_ORDERS_FOR_LINE_FETCH = 16;
 const ORDER_ITEMS_PAGE_SIZE = 200;
 const ORDER_FETCH_CONCURRENCY = 8;
+
+function skipPerOrderLineFetch(): boolean {
+  return process.env.SMART_ORDERING_SKIP_ORDER_LINE_FETCH === "true";
+}
+
+type OrderLineItem = {
+  inventoryItemId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+function mapOrderItemRow(r: Record<string, unknown>): OrderLineItem {
+  const q = r.Quantity;
+  const qty =
+    typeof q === "number"
+      ? q
+      : typeof q === "string"
+        ? Number(q)
+        : Number(q ?? 0);
+  const up = r.UnitPrice;
+  const price =
+    typeof up === "number"
+      ? up
+      : typeof up === "string"
+        ? Number(up)
+        : Number(up ?? 0);
+  return {
+    inventoryItemId: String(r.InventoryItemId ?? ""),
+    productName: String(r.ProductName ?? ""),
+    quantity: Number.isFinite(qty) ? qty : 0,
+    unitPrice: Number.isFinite(price) ? price : 0,
+  };
+}
 
 export type InventoryMergeRow = {
   id: string;
@@ -159,7 +199,22 @@ function inventoryFromEnvelope(body: unknown): {
   return { promptText, mergeBySkuKey };
 }
 
-type OrderHeader = { id: string; orderDate: string; orderType: string; orderStatus: string };
+type OrderHeader = {
+  id: string;
+  orderDate: string;
+  orderType: string;
+  orderStatus: string;
+  /** When GET /api/order/list includes OrderItems, we avoid N+1 calls to orderItem/list. */
+  embeddedItems?: OrderLineItem[];
+};
+
+/** Parse backend order dates (ISO, US locale strings, etc.). */
+function parseOrderDateToMs(dateStr: string): number | null {
+  const s = dateStr.trim();
+  if (!s) return null;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : t;
+}
 
 function parseOrderList(body: unknown): OrderHeader[] {
   if (!body || typeof body !== "object") return [];
@@ -176,6 +231,13 @@ function parseOrderList(body: unknown): OrderHeader[] {
           : od instanceof Date
             ? od.toISOString()
             : String(od);
+    const oi = r.OrderItems;
+    let embeddedItems: OrderLineItem[] | undefined;
+    if (Array.isArray(oi) && oi.length > 0) {
+      embeddedItems = oi.map((item) =>
+        mapOrderItemRow(item as Record<string, unknown>),
+      );
+    }
     return {
       id: String(r.Id ?? ""),
       orderDate: dateStr,
@@ -184,55 +246,22 @@ function parseOrderList(body: unknown): OrderHeader[] {
         r.OrderStatus === null || r.OrderStatus === undefined
           ? ""
           : String(r.OrderStatus),
+      embeddedItems,
     };
   }).filter((x) => x.id);
 }
 
-function parseOrderItems(body: unknown): Array<{
-  inventoryItemId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-}> {
+function parseOrderItems(body: unknown): OrderLineItem[] {
   if (!body || typeof body !== "object") return [];
   const o = body as ApiEnvelope;
   if (o.Success === false || !Array.isArray(o.Data)) return [];
-  return o.Data.map((row) => {
-    const r = row as Record<string, unknown>;
-    const q = r.Quantity;
-    const qty =
-      typeof q === "number"
-        ? q
-        : typeof q === "string"
-          ? Number(q)
-          : Number(q ?? 0);
-    const up = r.UnitPrice;
-    const price =
-      typeof up === "number"
-        ? up
-        : typeof up === "string"
-          ? Number(up)
-          : Number(up ?? 0);
-    return {
-      inventoryItemId: String(r.InventoryItemId ?? ""),
-      productName: String(r.ProductName ?? ""),
-      quantity: Number.isFinite(qty) ? qty : 0,
-      unitPrice: Number.isFinite(price) ? price : 0,
-    };
-  });
+  return o.Data.map((row) => mapOrderItemRow(row as Record<string, unknown>));
 }
 
 async function fetchOrderItemsForOrder(
   authorizationHeader: string,
   orderId: string,
-): Promise<
-  Array<{
-    inventoryItemId: string;
-    productName: string;
-    quantity: number;
-    unitPrice: number;
-  }>
-> {
+): Promise<OrderLineItem[]> {
   const path = `/api/orderItem/list/${orderId}?Page=1&PageSize=${ORDER_ITEMS_PAGE_SIZE}`;
   const res = await backendGet(authorizationHeader, path);
   if (!res.ok) return [];
@@ -242,6 +271,7 @@ async function fetchOrderItemsForOrder(
 async function buildOrdersPromptSection(
   authorizationHeader: string,
   mergeByInventoryId: Map<string, InventoryMergeRow>,
+  demandWindowDays: number,
 ): Promise<{ text: string; hasData: boolean }> {
   const listPath = `/api/order/list?Page=1&PageSize=${ORDER_LIST_PAGE_SIZE}`;
   const listRes = await backendGet(authorizationHeader, listPath);
@@ -256,6 +286,15 @@ async function buildOrdersPromptSection(
   const orders = parseOrderList(listRes.body);
   const slice = orders.slice(0, MAX_ORDERS_FOR_LINE_FETCH);
 
+  const cutoffMs = Date.now() - demandWindowDays * 86_400_000;
+  const ordersInWindow = slice.filter((ord) => {
+    const ms = parseOrderDateToMs(ord.orderDate);
+    if (ms === null) {
+      return true;
+    }
+    return ms >= cutoffMs;
+  });
+
   const lines: Array<{
     order_id: string;
     order_date: string;
@@ -267,11 +306,16 @@ async function buildOrdersPromptSection(
     qty_ordered: number;
   }> = [];
 
-  for (let i = 0; i < slice.length; i += ORDER_FETCH_CONCURRENCY) {
-    const batch = slice.slice(i, i + ORDER_FETCH_CONCURRENCY);
+  const skipLines = skipPerOrderLineFetch();
+
+  for (let i = 0; i < ordersInWindow.length; i += ORDER_FETCH_CONCURRENCY) {
+    const batch = ordersInWindow.slice(i, i + ORDER_FETCH_CONCURRENCY);
     const nested = await Promise.all(
       batch.map(async (ord) => {
-        const items = await fetchOrderItemsForOrder(authorizationHeader, ord.id);
+        let items: OrderLineItem[] = ord.embeddedItems ?? [];
+        if (items.length === 0 && !skipLines) {
+          items = await fetchOrderItemsForOrder(authorizationHeader, ord.id);
+        }
         return items.map((it) => {
           const invRow = mergeByInventoryId.get(it.inventoryItemId);
           const nameFromInv = invRow?.productName ?? "";
@@ -328,8 +372,12 @@ async function buildOrdersPromptSection(
 
   const envelope = {
     source:
-      "Capstone WMS GET /api/order/list + GET /api/orderItem/list/{orderId} (live database)",
-    orders_scanned_for_lines: slice.length,
+      "Capstone WMS: GET /api/order/list; line items from embedded OrderItems when present, else GET /api/orderItem/list/{orderId} (unless SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true)",
+    demand_window_days: demandWindowDays,
+    demand_window_note:
+      "Only order lines whose parent order OrderDate falls within the last N days (UTC) are included; unparseable dates are kept.",
+    orders_considered_in_window: ordersInWindow.length,
+    orders_scanned_cap: MAX_ORDERS_FOR_LINE_FETCH,
     order_lines_in_prompt: lines.length,
     sku_demand_summary: skuDemandSummary.slice(0, 200),
     recent_order_lines_sample: lines.slice(0, 120),
@@ -345,12 +393,24 @@ async function buildOrdersPromptSection(
   return { text, hasData };
 }
 
+export type LoadSmartOrderingOptions = {
+  /** Order history lookback: only orders with OrderDate within this many days (approximate, UTC). Default 30. */
+  demandWindowDays?: number;
+};
+
 /**
  * Loads inventory (required) and enriches with order history (best-effort).
  */
 export async function loadSmartOrderingContext(
   authorizationHeader: string,
+  options: LoadSmartOrderingOptions = {},
 ): Promise<SmartOrderingLiveContext> {
+  const demandWindowDays =
+    typeof options.demandWindowDays === "number" &&
+    Number.isFinite(options.demandWindowDays) &&
+    options.demandWindowDays > 0
+      ? Math.min(365, Math.max(1, Math.round(options.demandWindowDays)))
+      : 30;
   const trimmed = authorizationHeader.trim();
   if (!trimmed.toLowerCase().startsWith("bearer ")) {
     return { ok: false, status: 401, message: "Missing or invalid Authorization header." };
@@ -379,7 +439,11 @@ export async function loadSmartOrderingContext(
     }
   }
 
-  const ordersBlock = await buildOrdersPromptSection(trimmed, mergeByInventoryId);
+  const ordersBlock = await buildOrdersPromptSection(
+    trimmed,
+    mergeByInventoryId,
+    demandWindowDays,
+  );
 
   const promptText = parsed.promptText + ordersBlock.text;
 

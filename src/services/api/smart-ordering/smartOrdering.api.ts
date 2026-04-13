@@ -83,10 +83,19 @@ function delay(ms: number) {
  *   (GitHub Models + `Agent.md`). Requires `GITHUB_TOKEN` in `.env.local` (server only).
  *   When the user is logged in, sends `Authorization: Bearer` so the route can load live inventory
  *   from Express `GET /api/inventory/list` and ground the model on real DB rows.
+ *   `demandWindowDays` filters order history by parent order date (passed in JSON body).
  * - Optional: `NEXT_PUBLIC_SMART_ORDERING_SOURCE=express` + mock false → capstone Express
  *   `GET` `/api/smart-ordering/recommendations` (when backend implements it).
  */
-export async function getSmartOrderingRecommendations(): Promise<SmartOrderingRow[]> {
+export type GetSmartOrderingOptions = {
+  /** Aborts the request to `/api/smart-ordering/generate` (e.g. timeout or user navigates away). */
+  signal?: AbortSignal;
+};
+
+export async function getSmartOrderingRecommendations(
+  demandWindowDays: number = 30,
+  options: GetSmartOrderingOptions = {},
+): Promise<SmartOrderingRow[]> {
   const useMock =
     typeof process.env.NEXT_PUBLIC_SMART_ORDERING_MOCK === "undefined" ||
     process.env.NEXT_PUBLIC_SMART_ORDERING_MOCK !== "false";
@@ -122,14 +131,37 @@ export async function getSmartOrderingRecommendations(): Promise<SmartOrderingRo
     headers.Authorization = `Bearer ${jwt}`;
   }
 
+  const days =
+    Number.isFinite(demandWindowDays) && demandWindowDays > 0
+      ? Math.min(365, Math.max(1, Math.round(demandWindowDays)))
+      : 30;
+
   const res = await fetch("/api/smart-ordering/generate", {
     method: "POST",
     headers,
-    body: JSON.stringify({}),
+    body: JSON.stringify({ demandWindowDays: days }),
+    signal: options.signal,
   });
-  const data = (await res.json()) as { rows?: SmartOrderingRow[]; error?: string };
+
+  const rawText = await res.text();
+  let data: { rows?: SmartOrderingRow[]; error?: string } = {};
+  try {
+    data = rawText ? (JSON.parse(rawText) as typeof data) : {};
+  } catch {
+    const hint =
+      /too many requests/i.test(rawText) || res.status === 429
+        ? "GitHub Models rate limit — wait a few minutes and try again."
+        : rawText.slice(0, 180).trim() || `Invalid response (${res.status})`;
+    throw new Error(hint);
+  }
+
   if (!res.ok) {
-    throw new Error(data?.error || `AI route failed (${res.status})`);
+    throw new Error(
+      data?.error ||
+        (res.status === 429
+          ? "GitHub Models rate limit — wait and retry."
+          : `AI route failed (${res.status})`),
+    );
   }
   if (!Array.isArray(data.rows)) {
     throw new Error("Invalid response: missing rows array");

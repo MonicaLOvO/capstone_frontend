@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
   Box,
   Chip,
   Input,
-  LinearProgress,
   Option,
   Select,
   Sheet,
@@ -36,8 +35,19 @@ function riskLabel(risk: StockoutRiskLevel) {
   return risk.charAt(0).toUpperCase() + risk.slice(1);
 }
 
-function stockBarColor(risk: StockoutRiskLevel): "danger" | "warning" | "success" {
-  return riskChipColor(risk);
+function stockLevelBarFill(risk: StockoutRiskLevel): string {
+  if (risk === "high") return "var(--joy-palette-danger-500, #c41c1c)";
+  if (risk === "medium") return "var(--joy-palette-warning-500, #9a5b13)";
+  return "var(--joy-palette-success-500, #1f7a1f)";
+}
+
+function stockFillPercent(row: SmartOrderingRow): number {
+  const stock = Number.isFinite(row.currentStock) ? row.currentStock : 0;
+  const cap =
+    Number.isFinite(row.maxCapacity) && row.maxCapacity > 0
+      ? row.maxCapacity
+      : Math.max(1, stock);
+  return Math.min(100, Math.max(0, Math.round((stock / cap) * 100)));
 }
 
 export default function SmartOrderingPage() {
@@ -47,13 +57,17 @@ export default function SmartOrderingPage() {
   const { has } = usePermissions(effectiveRole);
 
   const [rows, setRows] = useState<SmartOrderingRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const fetchGeneration = useRef(0);
 
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("30");
   const [riskFilter, setRiskFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  const timeframeRef = useRef(timeframe);
+  timeframeRef.current = timeframe;
 
   useEffect(() => {
     if (role !== undefined && !has("ai.view")) {
@@ -61,31 +75,82 @@ export default function SmartOrderingPage() {
     }
   }, [role, has, router]);
 
+  const blocking = role === undefined || loading;
+
   useEffect(() => {
+    if (role === undefined) return;
+
+    if (!has("ai.view")) {
+      setLoading(false);
+      setRows([]);
+      setLoadError(null);
+      return;
+    }
+
+    const gen = ++fetchGeneration.current;
+    const ac = new AbortController();
+    /** Inventory + optional many order calls + GitHub Models can exceed a few minutes. */
+    const timeoutMs = 360_000;
+    const timeoutId = window.setTimeout(() => ac.abort(), timeoutMs);
+
     let cancelled = false;
+
+    const snapshotTimeframe = timeframe;
+
     async function load() {
-      if (role !== undefined && !has("ai.view")) return;
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await getSmartOrderingRecommendations();
-        if (!cancelled) setRows(data);
+        const days = Number(snapshotTimeframe) || 30;
+        const data = await getSmartOrderingRecommendations(days, {
+          signal: ac.signal,
+        });
+        if (
+          !cancelled &&
+          gen === fetchGeneration.current &&
+          snapshotTimeframe === timeframeRef.current
+        ) {
+          setRows(data);
+        }
       } catch (e) {
-        if (!cancelled) {
+        if (cancelled || gen !== fetchGeneration.current) return;
+        if (snapshotTimeframe !== timeframeRef.current) {
+          return;
+        }
+        const isAbort =
+          (e instanceof DOMException || e instanceof Error) &&
+          e.name === "AbortError";
+        if (isAbort) {
           setLoadError(
-            e instanceof Error ? e.message : "Could not load recommendations.",
+            "Request timed out after 6 minutes (order API round-trips + AI). Ensure Express is running and reachable from Next, set SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true on the server if order lines are slow, or try again.",
           );
           setRows([]);
+          return;
         }
+        setLoadError(
+          e instanceof Error ? e.message : "Could not load recommendations.",
+        );
+        setRows([]);
       } finally {
-        if (!cancelled) setLoading(false);
+        window.clearTimeout(timeoutId);
+        if (
+          !cancelled &&
+          gen === fetchGeneration.current &&
+          snapshotTimeframe === timeframeRef.current
+        ) {
+          setLoading(false);
+        }
       }
     }
+
     void load();
+
     return () => {
       cancelled = true;
+      ac.abort();
+      window.clearTimeout(timeoutId);
     };
-  }, [role, has]);
+  }, [role, has, timeframe]);
 
   const categories = useMemo(() => {
     const set = new Set(rows.map((r) => r.category));
@@ -136,7 +201,7 @@ export default function SmartOrderingPage() {
         }}
       >
         <Input
-          placeholder="Search by item name or SKU"
+          placeholder="Search by item name, SKU, or category"
           startDecorator={<SearchRounded />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -149,9 +214,9 @@ export default function SmartOrderingPage() {
           startDecorator={<FilterListRounded />}
           sx={{ minWidth: 160 }}
         >
-          <Option value="14">Next 14 days</Option>
-          <Option value="30">Next 30 days</Option>
-          <Option value="90">Next 90 days</Option>
+          <Option value="14">Last 14 days (order history)</Option>
+          <Option value="30">Last 30 days (order history)</Option>
+          <Option value="90">Last 90 days (order history)</Option>
         </Select>
         <Select
           size="md"
@@ -196,7 +261,7 @@ export default function SmartOrderingPage() {
           }}
         >
           <Typography level="body-sm">
-            {loading
+            {blocking
               ? "Loading recommendations…"
               : `Showing ${filtered.length} recommendation(s)`}
           </Typography>
@@ -221,7 +286,7 @@ export default function SmartOrderingPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {blocking ? (
                 <tr>
                   <td colSpan={6}>
                     <Box sx={{ py: 6, textAlign: "center" }}>
@@ -243,10 +308,7 @@ export default function SmartOrderingPage() {
                 </tr>
               ) : (
                 filtered.map((r) => {
-                  const pct = Math.min(
-                    100,
-                    Math.round((r.currentStock / r.maxCapacity) * 100),
-                  );
+                  const pct = stockFillPercent(r);
                   return (
                     <tr key={r.id}>
                       <td>
@@ -273,12 +335,25 @@ export default function SmartOrderingPage() {
                         <Typography level="body-sm" fontWeight={600}>
                           {r.currentStock} units / {r.maxCapacity}
                         </Typography>
-                        <LinearProgress
-                          determinate
-                          value={pct}
-                          color={stockBarColor(r.stockoutRisk)}
-                          sx={{ mt: 0.75, height: 6, borderRadius: "sm" }}
-                        />
+                        <Box
+                          sx={{
+                            mt: 0.75,
+                            height: 8,
+                            borderRadius: "sm",
+                            bgcolor: "var(--joy-palette-neutral-200, #e4e4e7)",
+                            overflow: "hidden",
+                          }}
+                          title={`${pct}% of estimated max capacity`}
+                        >
+                          <Box
+                            sx={{
+                              height: "100%",
+                              width: `${pct}%`,
+                              bgcolor: stockLevelBarFill(r.stockoutRisk),
+                              transition: "width 0.2s ease",
+                            }}
+                          />
+                        </Box>
                       </td>
                       <td>
                         <Typography

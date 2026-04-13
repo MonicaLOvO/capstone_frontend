@@ -184,7 +184,7 @@ function inventoryFromEnvelope(body: unknown): {
   });
 
   const envelope = {
-    source: "Capstone WMS GET /api/inventory/list (live database)",
+    source: "WareTrack app — GET /api/inventory/list (live database)",
     page: o.Page ?? 1,
     pageSize: o.PageSize ?? items.length,
     totalCount: o.Total ?? items.length,
@@ -372,7 +372,7 @@ async function buildOrdersPromptSection(
 
   const envelope = {
     source:
-      "Capstone WMS: GET /api/order/list; line items from embedded OrderItems when present, else GET /api/orderItem/list/{orderId} (unless SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true)",
+      "WareTrack app — GET /api/order/list; line items from embedded OrderItems when present, else GET /api/orderItem/list/{orderId} (unless SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true)",
     demand_window_days: demandWindowDays,
     demand_window_note:
       "Only order lines whose parent order OrderDate falls within the last N days (UTC) are included; unparseable dates are kept.",

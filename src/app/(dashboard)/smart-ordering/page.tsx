@@ -317,7 +317,16 @@ export default function SmartOrderingPage() {
                             size="sm"
                             src={r.imageUrl ?? undefined}
                             alt=""
-                            sx={{ bgcolor: "neutral.softBg" }}
+                            sx={{
+                              bgcolor: "neutral.softBg",
+                              color: "neutral.softColor",
+                              fontWeight: 600,
+                              "html[data-joy-color-scheme='dark'] &": {
+                                bgcolor: "rgba(255, 255, 255, 0.12)",
+                                border: "1px solid rgba(255, 255, 255, 0.24)",
+                                color: "var(--joy-palette-neutral-100, #f4f4f5)",
+                              },
+                            }}
                           >
                             {r.name.charAt(0)}
                           </Avatar>
@@ -389,6 +398,13 @@ export default function SmartOrderingPage() {
                           size="sm"
                           variant="soft"
                           color={riskChipColor(r.stockoutRisk)}
+                          sx={{
+                            minWidth: 88,
+                            px: 0.5,
+                            display: "inline-flex",
+                            justifyContent: "center",
+                            "& .MuiChip-label": { textAlign: "center", width: "100%" },
+                          }}
                         >
                           {riskLabel(r.stockoutRisk)}
                         </Chip>

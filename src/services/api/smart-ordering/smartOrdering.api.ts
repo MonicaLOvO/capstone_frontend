@@ -15,7 +15,7 @@ const MOCK_RECOMMENDATIONS: SmartOrderingRow[] = [
     currentStock: 82,
     maxCapacity: 300,
     recommendedQty: 150,
-    recommendationNote: "Suggested reorder based on forecasted depletion",
+    recommendationNote: "Seasonal demand spike; current stock won’t last the window",
     reasoning:
       "Velocity increasing by 40% due to seasonal demand spike across retail channels.",
     stockoutRisk: "high",
@@ -45,7 +45,7 @@ const MOCK_RECOMMENDATIONS: SmartOrderingRow[] = [
     currentStock: 210,
     maxCapacity: 400,
     recommendedQty: 40,
-    recommendationNote: "Suggested reorder based on forecasted depletion",
+    recommendationNote: "Stable demand with slight uptick from new workstations",
     reasoning:
       "Stable usage with slight upward trend from new workstation onboarding next month.",
     stockoutRisk: "low",
@@ -60,7 +60,7 @@ const MOCK_RECOMMENDATIONS: SmartOrderingRow[] = [
     currentStock: 18,
     maxCapacity: 120,
     recommendedQty: 60,
-    recommendationNote: "Suggested reorder based on forecasted depletion",
+    recommendationNote: "Promo-driven velocity; below safety level within ~12 days",
     reasoning:
       "Promotional bundle driving attach rate; stock projected below safety level in 12 days.",
     stockoutRisk: "high",

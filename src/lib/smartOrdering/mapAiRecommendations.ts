@@ -11,6 +11,8 @@ export interface AiRecommendationItem {
   stockout_risk?: string;
   confidence_score?: number;
   confidence_label?: string;
+  /** Short UI line under recommended qty (see Agent.md) */
+  recommendation_note?: string;
   reasoning?: string;
 }
 
@@ -21,8 +23,11 @@ function normalizeRisk(risk: string | undefined): StockoutRiskLevel {
   return "medium";
 }
 
+const DEFAULT_RECOMMENDATION_NOTE = "Suggested reorder based on forecasted depletion";
+
 export function mapAiItemToRow(item: AiRecommendationItem, index: number): SmartOrderingRow {
   const sku = String(item.sku ?? `sku-${index}`);
+  const note = String(item.recommendation_note ?? "").trim();
   return {
     id: sku,
     name: String(item.item_name ?? sku),
@@ -31,7 +36,7 @@ export function mapAiItemToRow(item: AiRecommendationItem, index: number): Smart
     currentStock: Number(item.current_stock_units ?? 0),
     maxCapacity: Math.max(1, Number(item.max_capacity_units ?? 100)),
     recommendedQty: Math.max(0, Number(item.recommended_reorder_units ?? 0)),
-    recommendationNote: "Suggested reorder based on forecasted depletion",
+    recommendationNote: note || DEFAULT_RECOMMENDATION_NOTE,
     reasoning: String(item.reasoning ?? ""),
     stockoutRisk: normalizeRisk(item.stockout_risk),
     confidencePercent: Math.min(100, Math.max(0, Number(item.confidence_score ?? 0))),

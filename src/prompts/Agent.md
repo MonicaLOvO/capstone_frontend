@@ -21,7 +21,7 @@ and return **smart reorder recommendations** for each item in a format that can 
 
 - **Item**
 - **Current stock**
-- **AI recommended qty**
+- **AI recommended qty** (with a short **recommendation note** line under it)
 - **AI reasoning**
 - **Stockout risk**
 - **Confidence score**
@@ -121,6 +121,8 @@ When data is incomplete, make the best reasonable estimate and clearly lower con
 
 Return **only valid JSON**.
 
+Each object in `recommendations` must include **`recommendation_note`**: one short line (about 60–100 characters) for the UI under **AI recommended qty**. It should summarize *why* that reorder quantity (e.g. recent demand, safety stock, lead time, or “limited data—conservative top-up” when history is sparse). Do not repeat the full `reasoning` paragraph.
+
 The JSON must follow this exact structure:
 
 ```json
@@ -147,6 +149,7 @@ The JSON must follow this exact structure:
       "stockout_risk": "High",
       "confidence_score": 94,
       "confidence_label": "seasonality match",
+      "recommendation_note": "Strong seasonal uplift; stock won’t cover next replenishment cycle",
       "reasoning": "Velocity increased due to seasonal demand and current inventory is projected to deplete before the next replenishment window.",
       "drivers": [
         "Recent sales trend is rising",

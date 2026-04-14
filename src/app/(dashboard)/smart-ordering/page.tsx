@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
   Box,
+  Button,
   Chip,
   Input,
   Option,
@@ -15,6 +16,7 @@ import {
 } from "@mui/joy";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import FilterListRounded from "@mui/icons-material/FilterListRounded";
+import AutoAwesomeRounded from "@mui/icons-material/AutoAwesomeRounded";
 import { useAuth } from "@/auth/AuthProvider";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getSmartOrderingRecommendations } from "@/services/api/smart-ordering/smartOrdering.api";
@@ -60,6 +62,7 @@ export default function SmartOrderingPage() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const fetchGeneration = useRef(0);
+  const inFlightAbortRef = useRef<AbortController | null>(null);
 
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("30");
@@ -75,81 +78,81 @@ export default function SmartOrderingPage() {
     }
   }, [role, has, router]);
 
-  const blocking = role === undefined || loading;
+  /** Changing the demand window invalidates in-flight work and clears the table until they generate again. */
+  useEffect(() => {
+    inFlightAbortRef.current?.abort();
+    inFlightAbortRef.current = null;
+    setRows([]);
+    setLoadError(null);
+    setLoading(false);
+  }, [timeframe]);
 
   useEffect(() => {
-    if (role === undefined) return;
-
     if (!has("ai.view")) {
-      setLoading(false);
       setRows([]);
       setLoadError(null);
-      return;
+      setLoading(false);
     }
+  }, [has]);
+
+  const blocking = role === undefined || loading;
+
+  const runGeneration = useCallback(async () => {
+    if (role === undefined || !has("ai.view")) return;
+
+    inFlightAbortRef.current?.abort();
+    const ac = new AbortController();
+    inFlightAbortRef.current = ac;
 
     const gen = ++fetchGeneration.current;
-    const ac = new AbortController();
+    const snapshotTimeframe = timeframe;
     /** Inventory + optional many order calls + GitHub Models can exceed a few minutes. */
     const timeoutMs = 360_000;
     const timeoutId = window.setTimeout(() => ac.abort(), timeoutMs);
 
-    let cancelled = false;
-
-    const snapshotTimeframe = timeframe;
-
-    async function load() {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const days = Number(snapshotTimeframe) || 30;
-        const data = await getSmartOrderingRecommendations(days, {
-          signal: ac.signal,
-        });
-        if (
-          !cancelled &&
-          gen === fetchGeneration.current &&
-          snapshotTimeframe === timeframeRef.current
-        ) {
-          setRows(data);
-        }
-      } catch (e) {
-        if (cancelled || gen !== fetchGeneration.current) return;
-        if (snapshotTimeframe !== timeframeRef.current) {
-          return;
-        }
-        const isAbort =
-          (e instanceof DOMException || e instanceof Error) &&
-          e.name === "AbortError";
-        if (isAbort) {
-          setLoadError(
-            "Request timed out after 6 minutes (order API round-trips + AI). Ensure Express is running and reachable from Next, set SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true on the server if order lines are slow, or try again.",
-          );
-          setRows([]);
-          return;
-        }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const days = Number(snapshotTimeframe) || 30;
+      const data = await getSmartOrderingRecommendations(days, {
+        signal: ac.signal,
+      });
+      if (
+        gen !== fetchGeneration.current ||
+        snapshotTimeframe !== timeframeRef.current
+      ) {
+        return;
+      }
+      setRows(data);
+    } catch (e) {
+      if (gen !== fetchGeneration.current) return;
+      if (snapshotTimeframe !== timeframeRef.current) return;
+      const isAbort =
+        (e instanceof DOMException || e instanceof Error) &&
+        e.name === "AbortError";
+      if (isAbort) {
         setLoadError(
-          e instanceof Error ? e.message : "Could not load recommendations.",
+          "Request timed out after 6 minutes (order API round-trips + AI). Ensure Express is running and reachable from Next, set SMART_ORDERING_SKIP_ORDER_LINE_FETCH=true on the server if order lines are slow, or try again.",
         );
         setRows([]);
-      } finally {
-        window.clearTimeout(timeoutId);
-        if (
-          !cancelled &&
-          gen === fetchGeneration.current &&
-          snapshotTimeframe === timeframeRef.current
-        ) {
-          setLoading(false);
-        }
+        return;
+      }
+      setLoadError(
+        e instanceof Error ? e.message : "Could not load recommendations.",
+      );
+      setRows([]);
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (inFlightAbortRef.current === ac) {
+        inFlightAbortRef.current = null;
+      }
+      if (
+        gen === fetchGeneration.current &&
+        snapshotTimeframe === timeframeRef.current
+      ) {
+        setLoading(false);
       }
     }
-
-    void load();
-
-    return () => {
-      cancelled = true;
-      ac.abort();
-      window.clearTimeout(timeoutId);
-    };
   }, [role, has, timeframe]);
 
   const categories = useMemo(() => {
@@ -178,17 +181,38 @@ export default function SmartOrderingPage() {
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography level="h1" sx={{ fontSize: "2rem", fontWeight: 700 }}>
-          AI reorder recommendations
-        </Typography>
-        <Typography
-          level="body-md"
-          sx={{ color: "text.tertiary", mt: 0.5, maxWidth: 720 }}
+      {/* Page header — same pattern as People / Departments */}
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          alignItems: { xs: "flex-start", md: "center" },
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography level="h1" sx={{ fontSize: "2.5rem", fontWeight: 700 }}>
+            AI reorder recommendations
+          </Typography>
+          <Typography level="body-sm" sx={{ color: "text.tertiary", mt: 0.5 }}>
+            Transparent recommendations with urgency, confidence, and reasoning
+            surfaced directly in each row.
+          </Typography>
+        </Box>
+
+        <Button
+          color="primary"
+          variant="solid"
+          startDecorator={<AutoAwesomeRounded />}
+          loading={loading}
+          disabled={role === undefined || !has("ai.view")}
+          onClick={() => void runGeneration()}
+          sx={{ mt: { xs: 1, md: 0 }, flexShrink: 0 }}
         >
-          Transparent recommendations with urgency, confidence, and reasoning
-          surfaced directly in each row.
-        </Typography>
+          Generate
+        </Button>
       </Box>
 
       <Box
@@ -263,7 +287,9 @@ export default function SmartOrderingPage() {
           <Typography level="body-sm">
             {blocking
               ? "Loading recommendations…"
-              : `Showing ${filtered.length} recommendation(s)`}
+              : rows.length === 0
+                ? "No recommendations loaded yet."
+                : `Showing ${filtered.length} recommendation(s)`}
           </Typography>
         </Box>
 
@@ -299,9 +325,13 @@ export default function SmartOrderingPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
-                    <Box sx={{ py: 6, textAlign: "center" }}>
+                    <Box sx={{ py: 6, textAlign: "center", px: 2 }}>
                       <Typography level="body-sm" color="neutral">
-                        No rows match your filters.
+                        {rows.length === 0 && !loadError
+                          ? "Pick a timeframe above, then click Generate to load AI recommendations. If you change the time window, click Generate again."
+                          : rows.length === 0 && loadError
+                            ? "Fix the issue above and try Generate again."
+                            : "No rows match your filters."}
                       </Typography>
                     </Box>
                   </td>

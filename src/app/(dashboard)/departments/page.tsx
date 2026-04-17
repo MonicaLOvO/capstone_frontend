@@ -18,10 +18,7 @@ import {
   departmentsApi,
   ApiDepartment,
 } from "@/services/api/departments/departments.api";
-import {
-  DepartmentDialog,
-  DepartmentForm,
-} from "./components/DepartmentDialog";
+import { DepartmentDialog } from "./components/DepartmentDialog";
 import { Dropdown, Menu, MenuButton, MenuItem, IconButton } from "@mui/joy";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { Chip } from "@mui/joy";
@@ -59,6 +56,10 @@ export default function DepartmentsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ApiDepartment | null>(null);
+  /** Remount Add dialog each open so fields reset (no leftover draft). */
+  const [createDepartmentFormKey, setCreateDepartmentFormKey] = useState(0);
+  /** Remount Edit dialog each open so fields match saved row. */
+  const [editDepartmentFormKey, setEditDepartmentFormKey] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -121,6 +122,7 @@ export default function DepartmentsPage() {
           onClick={() => {
             setEditing(null);
             setSubmitError(null);
+            setCreateDepartmentFormKey((k) => k + 1);
             setDialogOpen(true);
           }}
         >
@@ -209,6 +211,7 @@ export default function DepartmentsPage() {
                         onClick={() => {
                           setEditing(d);
                           setSubmitError(null);
+                          setEditDepartmentFormKey((k) => k + 1);
                           setDialogOpen(true);
                         }}
                       >
@@ -248,7 +251,11 @@ export default function DepartmentsPage() {
       </Sheet>
 
       <DepartmentDialog
-        key={editing?.Id ?? "create"}
+        key={
+          editing
+            ? `edit-${editing.Id}-${editDepartmentFormKey}`
+            : `create-${createDepartmentFormKey}`
+        }
         open={dialogOpen}
         initial={
           editing
@@ -262,6 +269,7 @@ export default function DepartmentsPage() {
         onClose={() => {
           setDialogOpen(false);
           setSubmitError(null);
+          setEditing(null);
         }}
         onSubmit={async (data) => {
           setSubmitError(null);

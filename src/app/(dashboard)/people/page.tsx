@@ -312,6 +312,10 @@ export default function PeoplePage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  /** Bumped each time Add Person opens so the drawer form remounts (no leftover unsaved fields). */
+  const [createPersonFormKey, setCreatePersonFormKey] = useState(0);
+  /** Bumped each time Edit opens so the form remounts from saved row data per session. */
+  const [editPersonFormKey, setEditPersonFormKey] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -359,6 +363,7 @@ export default function PeoplePage() {
             sx={{ mt: { xs: 1, md: 0 } }}
             onClick={() => {
               setEditingPerson(null);
+              setCreatePersonFormKey((k) => k + 1);
               setDrawerOpen(true);
             }}
           >
@@ -384,6 +389,7 @@ export default function PeoplePage() {
         onToggleStatus={toggleUserStatus}
         onEditPerson={(person) => {
           setEditingPerson(person);
+          setEditPersonFormKey((k) => k + 1);
           setDrawerOpen(true);
         }}
         onDeletePerson={(person) => {
@@ -422,6 +428,8 @@ export default function PeoplePage() {
         open={drawerOpen}
         mode={editingPerson ? "edit" : "create"}
         person={editingPerson}
+        createFormKey={createPersonFormKey}
+        editFormKey={editPersonFormKey}
         departments={selectableDepartments}
         availableRoles={availableRoles}
         currentUserRole={effectiveRole}
@@ -430,6 +438,7 @@ export default function PeoplePage() {
         onClose={() => {
           setDrawerOpen(false);
           setSubmitError(null);
+          setEditingPerson(null);
         }}
         onSubmit={async (data) => {
           setSubmitError(null);

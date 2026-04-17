@@ -11,12 +11,60 @@ import {
 } from "@mui/joy";
 import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRounded from "@mui/icons-material/VisibilityOffRounded";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Person, type BackendRoleName } from "../PeopleTable";
 import { validateUser, ValidationErrors, UserFormInput } from "@/validation/user.validation";
 
 /** Create includes initial password; edit never sends password from this form */
 export type PersonFormSubmitData = Partial<Person> & { password?: string };
+
+type FormState = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  username: string;
+  password: string;
+  confirmPassword: string;
+  role: Person["role"];
+  department: string;
+  status: Person["status"];
+};
+
+function getInitialFormState(
+  person: Person | null | undefined,
+  mode: "create" | "edit",
+): FormState {
+  const dept = person?.department ?? "";
+  const department = dept && dept !== "—" ? dept : "";
+  const rawUsername = person?.username ?? "";
+  const username =
+    !rawUsername || rawUsername === person?.email ? "" : rawUsername;
+  return {
+    firstName: person?.firstName ?? "",
+    lastName: person?.lastName ?? "",
+    email: person?.email ?? "",
+    username,
+    password: "",
+    confirmPassword: "",
+    role: person?.role ?? "staff",
+    department,
+    status: person?.status ?? "active",
+  };
+}
+
+function formIsDirty(a: FormState, b: FormState): boolean {
+  return (
+    a.firstName !== b.firstName ||
+    a.lastName !== b.lastName ||
+    a.email !== b.email ||
+    a.username !== b.username ||
+    a.password !== b.password ||
+    a.confirmPassword !== b.confirmPassword ||
+    a.role !== b.role ||
+    a.department !== b.department ||
+    a.status !== b.status
+  );
+}
 
 interface Props {
   mode: "create" | "edit";
@@ -28,6 +76,8 @@ interface Props {
   /** Only roles that exist in DB (from GET /api/role/list) */
   availableRoles: { role: Person["role"]; label: string }[];
   onSubmit: (data: PersonFormSubmitData) => void;
+  /** True when current values differ from last-opened snapshot (unsaved changes). */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function PersonForm({
@@ -38,39 +88,22 @@ export function PersonForm({
   departments,
   availableRoles,
   onSubmit,
+  onDirtyChange,
 }: Props) {
-  // preload edit values
-  type FormState = {
-    firstName: string;
-    lastName: string;
-    email: string;
-    username: string;
-    password: string;
-    confirmPassword: string;
-    role: Person["role"];
-    department: string;
-    status: Person["status"];
-  };
+  const [form, setForm] = useState<FormState>(() =>
+    getInitialFormState(person, mode),
+  );
 
-  const [form, setForm] = useState<FormState>(() => {
-    const dept = person?.department ?? "";
-    const department = dept && dept !== "—" ? dept : "";
-    // If username is missing or same as email (backend fallback), show empty so validation passes and we keep "use email"
-    const rawUsername = person?.username ?? "";
-    const username =
-      !rawUsername || rawUsername === person?.email ? "" : rawUsername;
-    return {
-      firstName: person?.firstName ?? "",
-      lastName: person?.lastName ?? "",
-      email: person?.email ?? "",
-      username,
-      password: "",
-      confirmPassword: "",
-      role: person?.role ?? "staff",
-      department,
-      status: person?.status ?? "active",
-    };
-  });
+  const baseline = useMemo(
+    () => getInitialFormState(person, mode),
+    [person?.id, mode],
+  );
+
+  const isDirty = useMemo(() => formIsDirty(form, baseline), [form, baseline]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
